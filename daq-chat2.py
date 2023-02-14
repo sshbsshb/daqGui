@@ -1,12 +1,19 @@
 import sys
 import csv
-import pyvisa
+import pyvisa, serial
 import time, logging
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
+from PySide2 import QtCore, QtGui
+from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
         QTabWidget, QHBoxLayout, QWidget, QHeaderView
+
+# from PyQt5 import QtCore, QtGui
+# from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
+#     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
+#     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
+#         QTabWidget, QHBoxLayout, QWidget, QHeaderView
+
 import pyqtgraph as pg
 import pandas as pd
 
@@ -24,26 +31,30 @@ class Ui_MainWindow(object):
         # self.dataPlot.resize(1420,820)
         self.gridLayout.addWidget(self.dataPlot, 0, 0, 1, 2)
 
-        self.startButton = QPushButton(self.centralwidget)
-        self.startButton.setObjectName("startButton")
-        self.gridLayout.addWidget(self.startButton, 1, 0)
-        self.stopButton = QPushButton(self.centralwidget)
-        self.stopButton.setObjectName("stopButton")
-        self.gridLayout.addWidget(self.stopButton, 1, 1)
         self.channelComboBox = QComboBox(self.centralwidget)
         self.channelComboBox.setObjectName("channelComboBox")
-        # self.gridLayout.addWidget(self.channelComboBox, 2, 0, 1, 2)
+        self.channelComboBox.setCurrentIndex(-1)
+        self.channelComboBox.setPlaceholderText('Select a channel to begin...')
+        self.gridLayout.addWidget(self.channelComboBox, 1, 0)
+
+        self.startButton = QPushButton(self.centralwidget)
+        self.startButton.setObjectName("startButton")
+        self.gridLayout.addWidget(self.startButton, 1, 1)
+        self.stopButton = QPushButton(self.centralwidget)
+        # self.stopButton.setObjectName("stopButton")
+        # self.gridLayout.addWidget(self.stopButton, 1, 1)
 
         self.tableWidget = QTableWidget()
-        self.tableWidget.setColumnCount(4)
-        self.tableWidget.setHorizontalHeaderLabels(['ID', 'Channel', 'Type', 'Display'])
+        self.tableWidget.setColumnCount(5)
+        self.tableWidget.setHorizontalHeaderLabels(['Channel id','Measurement','Sensor type','Display','Remark'])
         self.tableWidget.resize(800,20)
         header = self.tableWidget.horizontalHeader()       
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        self.tableWidget.setEditTriggers(QTableWidget.NoEditTriggers)
         self.gridLayout.addWidget(self.tableWidget, 2, 0, 1, 2)
 
         self.tab_widget = QTabWidget(self)
@@ -59,17 +70,36 @@ class Ui_MainWindow(object):
         self.tab1_layout.addWidget(self.load_button1, 0, 0)
         self.plot_button1 = QPushButton("Plot")
         self.tab1_layout.addWidget(self.plot_button1, 0, 1)
+
+        self.connect1_ComboBox = QComboBox(self.centralwidget)
+        self.connect1_ComboBox.setObjectName("channelComboBox")
+        self.connect1_ComboBox.setCurrentIndex(-1)
+        self.connect1_ComboBox.setPlaceholderText('Select a channel to begin...')
+        self.tab1_layout.addWidget(self.connect1_ComboBox, 1, 0)
+
         self.connect_vol_button1 = QPushButton("Connect 1")
-        self.tab1_layout.addWidget(self.connect_vol_button1, 1, 0)
+        self.tab1_layout.addWidget(self.connect_vol_button1, 1, 1)
         self.start_vol_button1 = QPushButton("Start")
-        self.tab1_layout.addWidget(self.start_vol_button1, 1, 1)        
+        self.tab1_layout.addWidget(self.start_vol_button1, 2, 1)
+        # self.connect1_checkBox = QCheckBox('combined control')
+        # self.connect1_checkBox.toggle()
+        # self.tab1_layout.addWidget(self.connect1_checkBox, 1, 2)
+        # self.checkBox.stateChanged.connect(self.updateDisplay)
+        text_syle_hint='QLineEdit {\
+                        background-color: white;\
+                    }\
+                    QLineEdit:no-text-inside-it {\
+                        background-color: gray;\
+                    }'
         self.value_edit1 = QLineEdit()
+        self.value_edit1.setPlaceholderText('Enter a float value only')
+        self.value_edit1.setStyleSheet(text_syle_hint)
         self.value_edit1.setFixedWidth(400)
         float_validator = QtGui.QRegExpValidator(QtCore.QRegExp("^[+-]?\d{0,3}(\.\d{1,2})?$"))
         self.value_edit1.setValidator(float_validator)
-        self.tab1_layout.addWidget(self.value_edit1, 2, 0)
+        self.tab1_layout.addWidget(self.value_edit1, 3, 0)
         self.set_button1 = QPushButton("Set value")
-        self.tab1_layout.addWidget(self.set_button1, 2, 1)
+        self.tab1_layout.addWidget(self.set_button1, 3, 1)
 
         self.tab2 = QWidget()
         self.tab_widget.addTab(self.tab2, "Control 2")
@@ -78,16 +108,25 @@ class Ui_MainWindow(object):
         self.tab2_layout.addWidget(self.load_button2, 0, 0)
         self.plot_button2 = QPushButton("Plot")
         self.tab2_layout.addWidget(self.plot_button2, 0, 1)
+
+        self.connect2_ComboBox = QComboBox(self.centralwidget)
+        self.connect2_ComboBox.setObjectName("channelComboBox")
+        self.connect2_ComboBox.setCurrentIndex(-1)
+        self.connect2_ComboBox.setPlaceholderText('Select a channel to begin...')
+        self.tab2_layout.addWidget(self.connect2_ComboBox, 1, 0)
+
         self.connect_vol_button2 = QPushButton("Connect 2")
-        self.tab2_layout.addWidget(self.connect_vol_button2, 1, 0)
+        self.tab2_layout.addWidget(self.connect_vol_button2, 1, 1)
         self.start_vol_button2 = QPushButton("Start")
-        self.tab2_layout.addWidget(self.start_vol_button2, 1, 1)    
+        self.tab2_layout.addWidget(self.start_vol_button2, 2, 1)    
         self.value_edit2 = QLineEdit()
+        self.value_edit2.setPlaceholderText('Enter a float value only')
+        self.value_edit2.setStyleSheet(text_syle_hint)
         self.value_edit2.setFixedWidth(400)
         self.value_edit2.setValidator(float_validator)
-        self.tab2_layout.addWidget(self.value_edit2, 2, 0)
+        self.tab2_layout.addWidget(self.value_edit2, 3, 0)
         self.set_button2 = QPushButton("Set value")
-        self.tab2_layout.addWidget(self.set_button2, 2, 1)
+        self.tab2_layout.addWidget(self.set_button2, 3, 1)
 
         self.gridLayout.setRowStretch(0, 5)
         self.gridLayout.setRowStretch(1, 0)
@@ -148,20 +187,34 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
 
         self.rm = pyvisa.ResourceManager()
         try:
-            self.device = self.rm.open_resource("USB0::0x0957::0x0407::MY44041119::0::INSTR")
+            devices = self.rm.list_resources()
+            if len(devices) > 0:
+                for device in devices:
+                    self.channelComboBox.addItem(device)
+            else: 
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText("Error")
+                msg.setInformativeText('No device found, DAQ disabled!')
+                msg.setWindowTitle("Error")
+                msg.exec_()
+                self.startButton.setEnabled(False)
+        except ValueError:
+            print('Device error')
+        
+        self.ports = serial.tools.list_ports.comports()
+        for port in self.ports:
+            self.connect1_ComboBox.addItem(port.device)
+            self.connect2_ComboBox.addItem(port.device)
+
+    def conenct_daq(self):
+        try:
+            # self.device = self.rm.open_resource("USB0::0x0957::0x0407::MY44041119::0::INSTR")
+            device_name = self.channelComboBox.currentText()
+            self.device = self.rm.open_resource(device_name)
             self.device.write("*RST")
         except ValueError:
-            print('No device found')
-            msg = QMessageBox()
-            msg.setIcon(QMessageBox.Critical)
-            msg.setText("Error")
-            msg.setInformativeText('No device found, DAQ disabled!')
-            msg.setWindowTitle("Error")
-            msg.exec_()
-            self.startButton.setEnabled(False)
-        
-        channels = ["Temperature 1", "Temperature 2", "Temperature 3", "Temperature 4"]
-        self.channelComboBox.addItems(channels)
+            print('error during connection')
 
     def load_vol_value(self):
         options = QFileDialog.Options()
@@ -181,7 +234,7 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
             self.data['value'] = [set_value if x < set_value else x for x in self.data['value']]
 
     def readCSV(self):
-        with open('data.csv', 'r') as f:
+        with open('config.csv', 'r') as f:
             reader = csv.reader(f, skipinitialspace=True, delimiter=',')
             headers = next(reader)
             for row in reader:
@@ -189,24 +242,26 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
                     headers[0]: row[0],
                     headers[1]: row[1],
                     headers[2]: row[2],
-                    headers[3]: row[3] == 'True'
+                    headers[3]: row[3] == 'True',
+                    headers[4]: row[4]
                 })
         self.updateTable()
 
     def updateTable(self):
         self.tableWidget.setRowCount(len(self.data))
         for i, item in enumerate(self.data):
-            self.tableWidget.setItem(i, 0, QTableWidgetItem(item['id']))
-            self.tableWidget.setItem(i, 1, QTableWidgetItem(item['channel']))
-            self.tableWidget.setItem(i, 2, QTableWidgetItem(item['type']))
+            self.tableWidget.setItem(i, 0, QTableWidgetItem(item['Channel id']))
+            self.tableWidget.setItem(i, 1, QTableWidgetItem(item['Measurement']))
+            self.tableWidget.setItem(i, 2, QTableWidgetItem(item['Sensor type']))
             checkBox = QCheckBox()
-            checkBox.setChecked(item['display'])
+            checkBox.setChecked(item['Display'])
             checkBox.stateChanged.connect(self.updateDisplay)
             self.tableWidget.setCellWidget(i, 3, checkBox)
+            self.tableWidget.setItem(i, 4, QTableWidgetItem(item['Remark']))
 
     def updateDisplay(self, state):
         row = self.tableWidget.indexAt(self.sender().pos()).row()
-        self.data[row]['display'] = state == QtCore.Qt.Checked
+        self.data[row]['Display'] = state == QtCore.Qt.Checked
     
     def start_data_acquisition(self):
         self.isAcquiringData = True

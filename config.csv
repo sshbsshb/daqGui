@@ -1,0 +1,3 @@
+Channel id,Measurement,Sensor type,Display,Remark
+1,VOLT, DC, True, flow pump
+2,TEMP,TC:K,False, flow temperature
