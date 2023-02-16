@@ -1,13 +1,17 @@
 import sys
 import csv
 import pyvisa, serial
-import time, logging
+from configparser import ConfigParser
+# import time, logging
 from PySide2 import QtCore, QtGui
 from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
-        QTabWidget, QHBoxLayout, QWidget, QHeaderView
+        QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
+from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 
+from threading import Thread
+from time import sleep
 # from PyQt5 import QtCore, QtGui
 # from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
 #     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
@@ -16,9 +20,239 @@ from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox,
 
 import pyqtgraph as pg
 import pandas as pd
+class EquipmentInfoTab(QWidget):
+    def __init__(self, equipment_config):
+        super().__init__()
+
+        # Create labels for each piece of equipment information
+        # name_label = QLabel(f"<b>Name:</b> {equipment_config['name']}")
+        # type_label = QLabel(f"<b>Type:</b> {equipment_config['type']}")
+        # layout = QVBoxLayout()
+        # layout.addWidget(name_label)
+        # layout.addWidget(type_label)
+
+        tab_layout = QGridLayout()
+        self.load_button = QPushButton("Load")
+        tab_layout.addWidget(self.load_button, 0, 0)
+        self.plot_button = QPushButton("Plot")
+        tab_layout.addWidget(self.plot_button, 0, 1)
+
+        # self.connect_ComboBox = QComboBox()
+        # self.connect_ComboBox.setObjectName("channelComboBox")
+        # self.connect_ComboBox.setCurrentIndex(-1)
+        # self.connect_ComboBox.setPlaceholderText('Select a channel to begin...')
+        # tab_layout.addWidget(self.connect_ComboBox, 1, 0)
+        
+        # Create the "Show Info" button
+        self.show_info_button = QPushButton("Show info")
+        tab_layout.addWidget(self.show_info_button, 1, 0)
+        # Connect the button to the show_info me,thod
+        self.show_info_button.clicked.connect(lambda: self.show_info(equipment_config))
+
+        self.connect_vol_button = QPushButton("Connect")
+        tab_layout.addWidget(self.connect_vol_button, 1, 1)
+        self.start_button = QPushButton("Start")
+        tab_layout.addWidget(self.start_button, 2, 0, 1, 2)
+        # self.connect1_checkBox = QCheckBox('combined control')
+        # self.connect1_checkBox.toggle()
+        # self.tab1_layout.addWidget(self.connect1_checkBox, 1, 2)
+        # self.checkBox.stateChanged.connect(self.updateDisplay)
+        text_syle_hint='QLineEdit {\
+                        background-color: white;\
+                    }\
+                    QLineEdit:no-text-inside-it {\
+                        background-color: gray;\
+                    }'
+        self.value_edit = QLineEdit()
+        self.value_edit.setPlaceholderText('Enter a float value only')
+        self.value_edit.setStyleSheet(text_syle_hint)
+        self.value_edit.setFixedWidth(400)
+        float_validator = QtGui.QRegExpValidator(QtCore.QRegExp("^[+-]?\d{0,3}(\.\d{1,2})?$"))
+        self.value_edit.setValidator(float_validator)
+        tab_layout.addWidget(self.value_edit, 3, 0)
+        self.set_button = QPushButton("Set value")
+        tab_layout.addWidget(self.set_button, 3, 1)
+
+        if equipment_config['type'] == 'serial':
+            # method_label = QLabel(f"<b>Method:</b> {equipment_config['method']}")
+            # port_label = QLabel(f"<b>Port:</b> {equipment_config['port']}")
+            # baudrate_label = QLabel(f"<b>Baudrate:</b> {equipment_config['baudrate']}")
+            # parity_label = QLabel(f"<b>Parity:</b> {equipment_config['parity']}")
+            # stopbits_label = QLabel(f"<b>Stopbits:</b> {equipment_config['stopbits']}")
+            # timeout_label = QLabel(f"<b>Timeout:</b> {equipment_config['timeout']}")
+            # slave_id_label = QLabel(f"<b>Slave ID:</b> {equipment_config['slave_id']}")
+
+
+            # self.tab2 = QWidget()
+            # self.tab_widget.addTab(self.tab2, "Control 2")
+            # self.tab2_layout = QGridLayout(self.tab2)
+            # self.load_button2 = QPushButton("Load")
+            # self.tab2_layout.addWidget(self.load_button2, 0, 0)
+            # self.plot_button2 = QPushButton("Plot")
+            # self.tab2_layout.addWidget(self.plot_button2, 0, 1)
+
+            # self.connect2_ComboBox = QComboBox(self.centralwidget)
+            # self.connect2_ComboBox.setObjectName("channelComboBox")
+            # self.connect2_ComboBox.setCurrentIndex(-1)
+            # self.connect2_ComboBox.setPlaceholderText('Select a channel to begin...')
+            # self.tab2_layout.addWidget(self.connect2_ComboBox, 1, 0)
+
+            # self.connect_vol_button2 = QPushButton("Connect 2")
+            # self.tab2_layout.addWidget(self.connect_vol_button2, 1, 1)
+            # self.start_vol_button2 = QPushButton("Start")
+            # self.tab2_layout.addWidget(self.start_vol_button2, 2, 1)    
+            # self.value_edit2 = QLineEdit()
+            # self.value_edit2.setPlaceholderText('Enter a float value only')
+            # self.value_edit2.setStyleSheet(text_syle_hint)
+            # self.value_edit2.setFixedWidth(400)
+            # self.value_edit2.setValidator(float_validator)
+            # self.tab2_layout.addWidget(self.value_edit2, 3, 0)
+            # self.set_button2 = QPushButton("Set value")
+            # self.tab2_layout.addWidget(self.set_button2, 3, 1)
+
+
+            # Add the labels to the layout
+
+
+            # layout.addWidget(method_label)
+            # layout.addWidget(port_label)
+            # layout.addWidget(baudrate_label)
+            # layout.addWidget(parity_label)
+            # layout.addWidget(stopbits_label)
+            # layout.addWidget(timeout_label)
+            # layout.addWidget(slave_id_label)
+            # # Create the "Connect" button
+            # connect_button = QPushButton("Connect")
+            # layout.addWidget(connect_button)
+            # # Connect the button to the connect_to_equipment method
+            # connect_button.clicked.connect(lambda: self.connect_to_equipment(equipment_config))
+            # # Create the "Synchronize" checkbox and "Start" button
+            # self.synchronize_checkbox = QCheckBox("Synchronize")
+            # layout.addWidget(self.synchronize_checkbox)
+            # self.start_button = QPushButton("Start")        # Read the configuration file
+
+            # # Connect the button to the start_operation method
+            self.start_button.clicked.connect(lambda: self.start_operation(equipment_config))
+
+        elif equipment_config['type'] == 'tcp':
+            # host_label = QLabel(f"<b>Host:</b> {equipment_config['host']}")
+            # port_label = QLabel(f"<b>Port:</b> {equipment_config['port']}")
+            # timeout_label = QLabel(f"<b>Timeout:</b> {equipment_config['timeout']}")
+            # slave_id_label = QLabel(f"<b>Slave ID:</b> {equipment_config['slave_id']}")
+            # # Add the labels to the layout
+            # layout.addWidget(host_label)
+            # layout.addWidget(port_label)
+            # layout.addWidget(timeout_label)
+            # layout.addWidget(slave_id_label)
+            # # Create the "Connect" button
+            # connect_button = QPushButton("Connect")
+            # layout.addWidget(connect_button)
+            # # Connect the button to the connect_to_equipment method
+            # connect_button.clicked.connect(lambda: self.connect_to_equipment(equipment_config))
+            # # Create the "Synchronize" checkbox and "Start" button
+            # self.synchronize_checkbox = QCheckBox("Synchronize")
+            # layout.addWidget(self.synchronize_checkbox)
+            # self.start_button = QPushButton("Start")
+            # layout.addWidget(self.start_button)
+            # # Connect the button to the start_operation method
+            # self.start_button.clicked.connect(lambda: self.start_operation(equipment_config))
+            # # Initialize the synchronization flag
+            self.is_synchronized = False
+
+        else:
+            # If the equipment type is not recognized, display an error message
+            error_label = QLabel("Error: Invalid equipment type")
+            layout = QVBoxLayout()
+            layout.addWidget(error_label)
+
+        self.setLayout(tab_layout)       
+
+    def connect_to_equipment(self, equipment_config):
+        if equipment_config['type'] == 'serial':
+            method = equipment_config['method']
+            port = equipment_config['port']
+            baudrate = equipment_config['baudrate']
+            parity = equipment_config['parity']
+            stopbits = equipment_config['stopbits']
+            timeout = equipment_config['timeout']
+            slave_id = equipment_config['slave_id']
+
+            # Create the ModbusSerialClient
+            client = ModbusSerialClient(method=method, port=port, baudrate=baudrate, parity=parity, stopbits=stopbits, timeout=timeout)
+            # Connect to the equipment
+            connection = client.connect()
+            if connection:
+                print(f"Connected to {equipment_config['name']} on {equipment_config['port']}")
+            else:
+                print(f"Failed to connect to {equipment_config['name']} on {equipment_config['port']}")
+
+            self.client = client
+
+        elif equipment_config['type'] == 'tcp':
+            host = equipment_config['host']
+            port = equipment_config['port']
+            timeout = equipment_config['timeout']
+            slave_id = equipment_config['slave_id']
+
+            # Create the ModbusTcpClient
+            client = ModbusTcpClient(host=host, port=port, timeout=timeout)
+            # Connect to the equipment
+            connection = client.connect()
+            if connection:
+                print(f"Connected to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
+            else:
+                print(f"Failed to connect to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
+
+            self.client = client
+
+        # TODO: Perform operations on the equipment using pymodbus
+
+        # Disconnect from the equipment when done
+        # client.close()
+    
+    def start_operation(self, equipment_config):
+        # Check the status of the synchronization checkbox
+        self.is_synchronized = self.synchronize_checkbox.isChecked()
+        print(f"Synchronization is {'' if self.is_synchronized else 'not '}enabled")
+
+        # Start a new thread to perform the operation
+        operation_thread = Thread(target=self.perform_operation, args=(equipment_config,))
+        operation_thread.start()
+    
+    def perform_operation(self, equipment_config):
+        # If synchronization is enabled, wait for all equipment to be ready
+        if self.is_synchronized:
+            sleep(5)
+            print("All equipment is ready to start operation simultaneously")
+
+        # Perform the operation on this equipment
+        print(f"Starting operation on {equipment_config['name']}")
+        # TODO: Perform operation using pymodbus
+
+        # Wait for the operation to finish
+        sleep(10)
+
+        print(f"Operation on {equipment_config['name']} is complete")
+
+    def show_info(self, equipment_config):
+        # Create a pop-up window to show the equipment information
+        info_dialog = QDialog()
+        info_dialog.setWindowTitle(f"Equipment Info: {equipment_config['name']}")
+        info_layout = QVBoxLayout()
+        for key, value in equipment_config.items():
+            label = QLabel(f"<b>{key.capitalize()}:</b> {value}")
+            info_layout.addWidget(label)
+        info_dialog.setLayout(info_layout)
+        info_dialog.exec_()
+    
+    def closeEvent(self, event):
+        # Disconnect from the equipment when the tab is closed
+        if hasattr(self, 'client'):
+            self.client.close()
+        event.accept()
 
 class Ui_MainWindow(object):
-    def setupUi(self, MainWindow):
+    def setupUi(self, MainWindow, config_file):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(800, 600)
         self.centralwidget = QWidget(MainWindow)
@@ -63,76 +297,21 @@ class Ui_MainWindow(object):
         # self.tab_widget.setMovable(True)
         self.gridLayout.addWidget(self.tab_widget, 3, 0, 1, 2)
 
-        self.tab1 = QWidget()
-        self.tab_widget.addTab(self.tab1, "Control 1")
-        self.tab1_layout = QGridLayout(self.tab1)
-        self.load_button1 = QPushButton("Load")
-        self.tab1_layout.addWidget(self.load_button1, 0, 0)
-        self.plot_button1 = QPushButton("Plot")
-        self.tab1_layout.addWidget(self.plot_button1, 0, 1)
+        # Read the configuration file
+        self.config = ConfigParser()
+        self.config.read(config_file)
 
-        self.connect1_ComboBox = QComboBox(self.centralwidget)
-        self.connect1_ComboBox.setObjectName("channelComboBox")
-        self.connect1_ComboBox.setCurrentIndex(-1)
-        self.connect1_ComboBox.setPlaceholderText('Select a channel to begin...')
-        self.tab1_layout.addWidget(self.connect1_ComboBox, 1, 0)
-
-        self.connect_vol_button1 = QPushButton("Connect 1")
-        self.tab1_layout.addWidget(self.connect_vol_button1, 1, 1)
-        self.start_vol_button1 = QPushButton("Start")
-        self.tab1_layout.addWidget(self.start_vol_button1, 2, 1)
-        # self.connect1_checkBox = QCheckBox('combined control')
-        # self.connect1_checkBox.toggle()
-        # self.tab1_layout.addWidget(self.connect1_checkBox, 1, 2)
-        # self.checkBox.stateChanged.connect(self.updateDisplay)
-        text_syle_hint='QLineEdit {\
-                        background-color: white;\
-                    }\
-                    QLineEdit:no-text-inside-it {\
-                        background-color: gray;\
-                    }'
-        self.value_edit1 = QLineEdit()
-        self.value_edit1.setPlaceholderText('Enter a float value only')
-        self.value_edit1.setStyleSheet(text_syle_hint)
-        self.value_edit1.setFixedWidth(400)
-        float_validator = QtGui.QRegExpValidator(QtCore.QRegExp("^[+-]?\d{0,3}(\.\d{1,2})?$"))
-        self.value_edit1.setValidator(float_validator)
-        self.tab1_layout.addWidget(self.value_edit1, 3, 0)
-        self.set_button1 = QPushButton("Set value")
-        self.tab1_layout.addWidget(self.set_button1, 3, 1)
-
-        self.tab2 = QWidget()
-        self.tab_widget.addTab(self.tab2, "Control 2")
-        self.tab2_layout = QGridLayout(self.tab2)
-        self.load_button2 = QPushButton("Load")
-        self.tab2_layout.addWidget(self.load_button2, 0, 0)
-        self.plot_button2 = QPushButton("Plot")
-        self.tab2_layout.addWidget(self.plot_button2, 0, 1)
-
-        self.connect2_ComboBox = QComboBox(self.centralwidget)
-        self.connect2_ComboBox.setObjectName("channelComboBox")
-        self.connect2_ComboBox.setCurrentIndex(-1)
-        self.connect2_ComboBox.setPlaceholderText('Select a channel to begin...')
-        self.tab2_layout.addWidget(self.connect2_ComboBox, 1, 0)
-
-        self.connect_vol_button2 = QPushButton("Connect 2")
-        self.tab2_layout.addWidget(self.connect_vol_button2, 1, 1)
-        self.start_vol_button2 = QPushButton("Start")
-        self.tab2_layout.addWidget(self.start_vol_button2, 2, 1)    
-        self.value_edit2 = QLineEdit()
-        self.value_edit2.setPlaceholderText('Enter a float value only')
-        self.value_edit2.setStyleSheet(text_syle_hint)
-        self.value_edit2.setFixedWidth(400)
-        self.value_edit2.setValidator(float_validator)
-        self.tab2_layout.addWidget(self.value_edit2, 3, 0)
-        self.set_button2 = QPushButton("Set value")
-        self.tab2_layout.addWidget(self.set_button2, 3, 1)
-
+        # Create a tab for each piece of equipment in the configuration file
+        for section_name in self.config.sections():
+            self.equipment_config = dict(self.config[section_name])
+            self.equipment_tab = EquipmentInfoTab(self.equipment_config)
+            # self.addTab(self.equipment_tab, self.equipment_config['name'])
+            self.tab_widget.addTab(self.equipment_tab, self.equipment_config['name'])      
+        
         self.gridLayout.setRowStretch(0, 5)
         self.gridLayout.setRowStretch(1, 0)
         self.gridLayout.setRowStretch(2, 1)
-        self.gridLayout.setRowStretch(3, 0)         
-
+        self.gridLayout.setRowStretch(3, 0)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 21))
@@ -161,9 +340,9 @@ class Ui_MainWindow(object):
         self.actionSave.setText(_translate("MainWindow", "Save"))
 
 class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None):
+    def __init__(self, config_file, parent=None):
         super(DataAcquisitionSystem, self).__init__(parent)
-        self.setupUi(self)
+        self.setupUi(self, config_file)
 
         self.data = []
         self.readCSV()
@@ -173,13 +352,13 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
         self.actionSave.triggered.connect(self.save_data)
         self.stopButton.setEnabled(False)
 
-        self.load_button1.clicked.connect(self.load_vol_value)
-        self.plot_button1.clicked.connect(self.plot_vol)
-        self.set_button1.clicked.connect(self.set_vol_value)
+        # self.load_button1.clicked.connect(self.load_vol_value)
+        # self.plot_button1.clicked.connect(self.plot_vol)
+        # self.set_button1.clicked.connect(self.set_vol_value)
 
-        self.load_button2.clicked.connect(self.load_vol_value)
-        self.plot_button2.clicked.connect(self.plot_vol)
-        self.set_button2.clicked.connect(self.set_vol_value)
+        # self.load_button2.clicked.connect(self.load_vol_value)
+        # self.plot_button2.clicked.connect(self.plot_vol)
+        # self.set_button2.clicked.connect(self.set_vol_value)
 
         self.temperatureData = []
         self.isAcquiringData = False
@@ -295,6 +474,6 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    dataAcquisitionSystem = DataAcquisitionSystem()
+    dataAcquisitionSystem = DataAcquisitionSystem(config_file='equipment_config.ini')
     dataAcquisitionSystem.show()
     sys.exit(app.exec_())
