@@ -3,20 +3,20 @@ import csv
 import pyvisa, serial
 from configparser import ConfigParser
 # import time, logging
-from PySide2 import QtCore, QtGui
-from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
-    QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
-    QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
-        QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
+# from PySide2 import QtCore, QtGui
+# from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
+#     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
+#     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
+#         QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
 from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 
 from threading import Thread
 from time import sleep
-# from PyQt5 import QtCore, QtGui
-# from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
-#     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
-#     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
-#         QTabWidget, QHBoxLayout, QWidget, QHeaderView
+from PyQt5 import QtCore, QtGui
+from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
+    QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
+    QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
+        QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
 
 import pyqtgraph as pg
 import pandas as pd
