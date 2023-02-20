@@ -11,6 +11,8 @@ from configparser import ConfigParser
 from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 
 from threading import Thread
+
+import threading
 from time import sleep
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
@@ -48,11 +50,13 @@ class EquipmentInfoTab(QWidget):
         tab_layout.addWidget(self.show_info_button, 1, 0)
         # Connect the button to the show_info me,thod
         self.show_info_button.clicked.connect(lambda: self.show_info(equipment_config))
-
         self.connect_vol_button = QPushButton("Connect")
         tab_layout.addWidget(self.connect_vol_button, 1, 1)
+
+        self.synchronize_checkbox = QCheckBox("Synchronize")
+        tab_layout.addWidget(self.synchronize_checkbox, 2, 0)
         self.start_button = QPushButton("Start")
-        tab_layout.addWidget(self.start_button, 2, 0, 1, 2)
+        tab_layout.addWidget(self.start_button, 2, 1 )
         # self.connect1_checkBox = QCheckBox('combined control')
         # self.connect1_checkBox.toggle()
         # self.tab1_layout.addWidget(self.connect1_checkBox, 1, 2)
@@ -254,7 +258,7 @@ class EquipmentInfoTab(QWidget):
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow, config_file):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(800, 600)
+        MainWindow.resize(1024, 1024)
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.gridLayout = QGridLayout(self.centralwidget)
@@ -262,8 +266,9 @@ class Ui_MainWindow(object):
         self.gridLayout.setSpacing(10)
         self.dataPlot = pg.PlotWidget(self.centralwidget)
         self.dataPlot.setObjectName("dataPlot")
-        # self.dataPlot.resize(1420,820)
-        self.gridLayout.addWidget(self.dataPlot, 0, 0, 1, 2)
+        # self.dataPlot.setGeometry(0, 0, 1024, 600)
+        self.dataPlot.resize(1420,820)
+        self.gridLayout.addWidget(self.dataPlot, 0, 0, 1, 3)
 
         self.channelComboBox = QComboBox(self.centralwidget)
         self.channelComboBox.setObjectName("channelComboBox")
@@ -271,17 +276,17 @@ class Ui_MainWindow(object):
         self.channelComboBox.setPlaceholderText('Select a channel to begin...')
         self.gridLayout.addWidget(self.channelComboBox, 1, 0)
 
-        self.startButton = QPushButton(self.centralwidget)
-        self.startButton.setObjectName("startButton")
-        self.gridLayout.addWidget(self.startButton, 1, 1)
-        self.stopButton = QPushButton(self.centralwidget)
-        # self.stopButton.setObjectName("stopButton")
-        # self.gridLayout.addWidget(self.stopButton, 1, 1)
+        self.daqConnectButton = QPushButton(self.centralwidget)
+        self.daqConnectButton.setObjectName("daqConnectButton")
+        self.gridLayout.addWidget(self.daqConnectButton, 1, 1)
+        self.daqStartButton = QPushButton(self.centralwidget)
+        self.daqStartButton.setObjectName("daqStartButton")
+        self.gridLayout.addWidget(self.daqStartButton, 1, 2)
 
         self.tableWidget = QTableWidget()
         self.tableWidget.setColumnCount(5)
         self.tableWidget.setHorizontalHeaderLabels(['Channel id','Measurement','Sensor type','Display','Remark'])
-        self.tableWidget.resize(800,20)
+        self.tableWidget.resize(1024,20)
         header = self.tableWidget.horizontalHeader()       
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -289,13 +294,13 @@ class Ui_MainWindow(object):
         header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.Stretch)
         self.tableWidget.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.gridLayout.addWidget(self.tableWidget, 2, 0, 1, 2)
+        self.gridLayout.addWidget(self.tableWidget, 2, 0, 1, 3)
 
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         self.tab_widget.setTabPosition(QTabWidget.North)
         # self.tab_widget.setMovable(True)
-        self.gridLayout.addWidget(self.tab_widget, 3, 0, 1, 2)
+        self.gridLayout.addWidget(self.tab_widget, 3, 0, 1, 3)
 
         # Read the configuration file
         self.config = ConfigParser()
@@ -334,10 +339,48 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Data Acquisition System"))
-        self.startButton.setText(_translate("MainWindow", "Start"))
-        self.stopButton.setText(_translate("MainWindow", "Stop"))
+        self.daqStartButton.setText(_translate("MainWindow", "Start"))
+        self.daqConnectButton.setText(_translate("MainWindow", "Connect"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.actionSave.setText(_translate("MainWindow", "Save"))
+
+
+class DAQThread(threading.Thread):
+    data_ready = QtCore.pyqtSignal(list)
+    def __init__(self, stop_event, daq_device, channels):
+        super().__init__()
+        self.stop_event = stop_event
+        self.daq_device = daq_device
+        self.channels = channels
+
+    def run(self):
+
+        if self.isDaqInitiated == False:
+            ###set up channels
+            ### to do
+            ####
+            ##############################
+            #################################
+            self.daq_device.write("*RST")
+            channel = self.channelComboBox.currentIndex() + 1
+            self.device.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
+            self.isDaqInitiated = True
+        else:
+            while not self.stop_event.is_set():
+                data = []
+                for channel in self.channels:
+                    reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
+                    data.append(float(reading))
+                # reading = self.daq.query("READ?")
+                # voltage_values = [float(val) for val in reading.split(",")]
+                ##########################################
+                # temperature = float(self.device.query("READ?"))
+                # self.temperatureData.append(temperature)
+                # self.plot.setData(self.temperatureData)
+                # QtGui.QGuiApplication.processEvents()
+                # time.sleep(0.1)
+                self.data_ready.emit(data)
+                time.sleep(1)
 
 class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
     def __init__(self, config_file, parent=None):
@@ -346,11 +389,12 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
 
         self.data = []
         self.readCSV()
-
-        self.startButton.clicked.connect(self.start_data_acquisition)
-        self.stopButton.clicked.connect(self.stop_data_acquisition)
+        
+        self.daq_stop_event = threading.Event()
+        # Connect signals to slots
+        self.daqStartButton.clicked.connect(self.data_acquisition)
+        # self.stopButton.clicked.connect(self.stop_data_acquisition)
         self.actionSave.triggered.connect(self.save_data)
-        self.stopButton.setEnabled(False)
 
         # self.load_button1.clicked.connect(self.load_vol_value)
         # self.plot_button1.clicked.connect(self.plot_vol)
@@ -360,9 +404,20 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
         # self.plot_button2.clicked.connect(self.plot_vol)
         # self.set_button2.clicked.connect(self.set_vol_value)
 
+        # # Set up plot
+        self.dataPlot.plotItem.addLegend()
+        self.plot_curve1 = self.dataPlot.plot(pen='r', name="Channel 101")
+        self.plot_curve2 = self.dataPlot.plot(pen='g', name="Channel 102")
+        self.dataPlot.setLabel('left', 'Voltage', units='V')
+        self.dataPlot.setLabel('bottom', 'Time', units='s')
+
         self.temperatureData = []
-        self.isAcquiringData = False
+        self.isDaqAcquiringData = False
+        self.isDaqConnected = False
+        self.isDaqInitiated = False
         self.plot = self.dataPlot.plot()
+        self.start_time = None  # Save the start time
+        self.window_size = 10  # Rolling window size in seconds
 
         self.rm = pyvisa.ResourceManager()
         try:
@@ -370,6 +425,7 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
             if len(devices) > 0:
                 for device in devices:
                     self.channelComboBox.addItem(device)
+                self.daqConnectButton.setEnabled(True)
             else: 
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Critical)
@@ -377,23 +433,46 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
                 msg.setInformativeText('No device found, DAQ disabled!')
                 msg.setWindowTitle("Error")
                 msg.exec_()
-                self.startButton.setEnabled(False)
+                self.daqStartButton.setEnabled(False)
+                self.daqConnectButton.setEnabled(False)
         except ValueError:
             print('Device error')
-        
-        self.ports = serial.tools.list_ports.comports()
-        for port in self.ports:
-            self.connect1_ComboBox.addItem(port.device)
-            self.connect2_ComboBox.addItem(port.device)
 
     def conenct_daq(self):
-        try:
-            # self.device = self.rm.open_resource("USB0::0x0957::0x0407::MY44041119::0::INSTR")
-            device_name = self.channelComboBox.currentText()
-            self.device = self.rm.open_resource(device_name)
-            self.device.write("*RST")
-        except ValueError:
-            print('error during connection')
+        if self.isDaqConnected == False:
+            try:
+                # self.device = self.rm.open_resource("USB0::0x0957::0x0407::MY44041119::0::INSTR")
+                self.daq_stop_event.clear()
+                device_name = self.channelComboBox.currentText()
+                self.daq_device = self.rm.open_resource(device_name)
+
+                self.daq_thread = DAQThread(self.daq_stop_event, self.daq_device, self.channels)
+                self.daq_thread.data_ready.connect(self.update_plot)
+                self.daq_thread.start()
+
+
+                self.daqStartButton.setEnabled(True)
+                self.isDaqConnected = True
+                self.daqConnectButton.setText("Disconnect")
+            except ValueError:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText("Error")
+                msg.setInformativeText('error during connection!')
+                msg.setWindowTitle("Error")
+                msg.exec_()
+                # print('error during connection')
+                self.daqStartButton.setEnabled(False)
+        else:
+            self.isDaqConnected = False
+            ############to do
+            ################
+            #############
+            self.daq_stop_event.set()
+            self.daq_thread.join()
+            self.daq_device.close()
+            event.accept()
+            self.daqConnectButton.setText("Connect")
 
     def load_vol_value(self):
         options = QFileDialog.Options()
@@ -442,25 +521,31 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
         row = self.tableWidget.indexAt(self.sender().pos()).row()
         self.data[row]['Display'] = state == QtCore.Qt.Checked
     
-    def start_data_acquisition(self):
-        self.isAcquiringData = True
-        self.startButton.setEnabled(False)
-        self.stopButton.setEnabled(True)
-
-        channel = self.channelComboBox.currentIndex() + 1
-        self.device.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
-
-        while self.isAcquiringData:
-            temperature = float(self.device.query("READ?"))
-            self.temperatureData.append(temperature)
-            self.plot.setData(self.temperatureData)
-            QtGui.QGuiApplication.processEvents()
-            time.sleep(0.1)
-
-    def stop_data_acquisition(self):
-        self.isAcquiringData = False
-        self.startButton.setEnabled(True)
-        self.stopButton.setEnabled(False)
+    def data_acquisition(self):
+        if self.isDaqAcquiringData == False:
+            self.daq_stop_event.clear()
+            self.isDaqAcquiringData = True
+            self.daqStartButton.setText("Stop")
+            # Set up data thread
+            if not self.daq_thread.isRunning():
+                self.daq_thread = DAQThread(self.daq_stop_event, self.daq_device, self.channels)
+                self.daq_thread.data_ready.connect(self.update_plot)
+                self.daq_thread.start()
+        else:
+            self.isDaqAcquiringData = False
+            self.daq_stop_event.set()
+            self.daq_thread.join()
+            self.daqStartButton.setText("Start")
+    
+    def update_plot(self, data):
+        current_time = time.monotonic()
+        if self.start_time is None:
+            self.start_time = current_time
+        elapsed_time = current_time - self.start_time  # Calculate elapsed time
+        self.plot_curve1.setData(self.plot_curve1.xData[-self.window_size:] + [elapsed_time], \
+            self.plot_curve1.yData[-self.window_size:] + [data[0]])
+        self.plot_curve2.setData(self.plot_curve2.xData[-self.window_size:] + [elapsed_time], \
+            self.plot_curve2.yData[-self.window_size:] + [data[1]])
 
     def save_data(self):
         # options = QFileDialog.Options()
