@@ -2,23 +2,24 @@ import sys
 import csv
 import pyvisa, serial
 from configparser import ConfigParser
-# import time, logging
-# from PySide2 import QtCore, QtGui
-# from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
-#     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
-#     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
-#         QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
+
+import time#, logging
+from PySide2 import QtCore, QtGui
+from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
+    QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
+    QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
+        QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
 from pymodbus.client import ModbusSerialClient, ModbusTcpClient
 
 from threading import Thread
 
 import threading
 from time import sleep
-from PyQt5 import QtCore, QtGui
-from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
-    QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
-    QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
-        QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
+# from PyQt5 import QtCore, QtGui
+# from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
+#     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
+#     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
+#         QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
 
 import pyqtgraph as pg
 import pandas as pd
@@ -32,6 +33,7 @@ class EquipmentInfoTab(QWidget):
         # layout = QVBoxLayout()
         # layout.addWidget(name_label)
         # layout.addWidget(type_label)
+        self.load_curve_data = None
 
         tab_layout = QGridLayout()
         self.load_button = QPushButton("Load")
@@ -48,10 +50,8 @@ class EquipmentInfoTab(QWidget):
         # Create the "Show Info" button
         self.show_info_button = QPushButton("Show info")
         tab_layout.addWidget(self.show_info_button, 1, 0)
-        # Connect the button to the show_info me,thod
-        self.show_info_button.clicked.connect(lambda: self.show_info(equipment_config))
-        self.connect_vol_button = QPushButton("Connect")
-        tab_layout.addWidget(self.connect_vol_button, 1, 1)
+        self.connect_button = QPushButton("Connect")
+        tab_layout.addWidget(self.connect_button, 1, 1)
 
         self.synchronize_checkbox = QCheckBox("Synchronize")
         tab_layout.addWidget(self.synchronize_checkbox, 2, 0)
@@ -76,6 +76,17 @@ class EquipmentInfoTab(QWidget):
         tab_layout.addWidget(self.value_edit, 3, 0)
         self.set_button = QPushButton("Set value")
         tab_layout.addWidget(self.set_button, 3, 1)
+
+        # Connect the button to the show_info me,thod
+        self.show_info_button.clicked.connect(lambda: self.show_info(equipment_config))
+        self.load_button.clicked.connect(lambda: self.load_curve(equipment_config))
+        self.plot_button.clicked.connect(lambda: self.plot_curve(equipment_config))
+        self.connect_button.clicked.connect(lambda: self.connect_equipment(equipment_config))
+        self.start_button.clicked.connect(lambda: self.start_operation(equipment_config))
+        self.set_button.clicked.connect(lambda: self.set_value(equipment_config))
+
+
+
 
         if equipment_config['type'] == 'serial':
             # method_label = QLabel(f"<b>Method:</b> {equipment_config['method']}")
@@ -171,7 +182,7 @@ class EquipmentInfoTab(QWidget):
 
         self.setLayout(tab_layout)       
 
-    def connect_to_equipment(self, equipment_config):
+    def connect_equipment(self, equipment_config):
         if equipment_config['type'] == 'serial':
             method = equipment_config['method']
             port = equipment_config['port']
@@ -213,6 +224,25 @@ class EquipmentInfoTab(QWidget):
 
         # Disconnect from the equipment when done
         # client.close()
+    def load_curve(self, equipment_config):
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+        file_name, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "", "CSV Files (*.csv);;All Files (*)", options=options)
+        if file_name:
+            self.load_curve_data = pd.read_csv(file_name)
+            # self.value_edit.setText(str(self.data['value'].mean()))
+
+    def plot_curve(self, equipment_config):
+        if hasattr(self, 'load_curve_data'):
+            self.curvePlot = pg.plot(self.load_curve_data['time'], self.load_curve_data['value'], title='Time vs Value')
+            self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
+            self.curvePlot.addItem(self.current_time_line)
+
+    def set_value(self, equipment_config):
+        if hasattr(self, 'load_curve_data'):
+            set_value = float(self.value_edit.text())
+            self.load_curve_data['value'] = [set_value if x > set_value else x for x in self.load_curve_data['value']]
+            # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
     
     def start_operation(self, equipment_config):
         # Check the status of the synchronization checkbox
@@ -312,7 +342,7 @@ class Ui_MainWindow(object):
             self.equipment_tab = EquipmentInfoTab(self.equipment_config)
             # self.addTab(self.equipment_tab, self.equipment_config['name'])
             self.tab_widget.addTab(self.equipment_tab, self.equipment_config['name'])      
-        
+
         self.gridLayout.setRowStretch(0, 5)
         self.gridLayout.setRowStretch(1, 0)
         self.gridLayout.setRowStretch(2, 1)
@@ -346,7 +376,7 @@ class Ui_MainWindow(object):
 
 
 class DAQThread(threading.Thread):
-    data_ready = QtCore.pyqtSignal(list)
+    data_ready = QtCore.Signal(list) ###different for pyqt5, use pyqtSignal
     def __init__(self, stop_event, daq_device, channels):
         super().__init__()
         self.stop_event = stop_event
@@ -362,15 +392,17 @@ class DAQThread(threading.Thread):
             ##############################
             #################################
             self.daq_device.write("*RST")
+            time.sleep(0.1)
             channel = self.channelComboBox.currentIndex() + 1
             self.device.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
+            time.sleep(0.1)
             self.isDaqInitiated = True
         else:
             while not self.stop_event.is_set():
-                data = []
+                temp_data = []
                 for channel in self.channels:
                     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
-                    data.append(float(reading))
+                    temp_data.append(float(reading))
                 # reading = self.daq.query("READ?")
                 # voltage_values = [float(val) for val in reading.split(",")]
                 ##########################################
@@ -379,19 +411,19 @@ class DAQThread(threading.Thread):
                 # self.plot.setData(self.temperatureData)
                 # QtGui.QGuiApplication.processEvents()
                 # time.sleep(0.1)
-                self.data_ready.emit(data)
+                self.data_ready.emit(temp_data)
                 time.sleep(1)
 
 class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
     def __init__(self, config_file, parent=None):
         super(DataAcquisitionSystem, self).__init__(parent)
         self.setupUi(self, config_file)
-
-        self.data = []
+        self.daq_config = []
         self.readCSV()
         
         self.daq_stop_event = threading.Event()
         # Connect signals to slots
+        self.daqConnectButton.clicked.connect(self.conenct_daq)
         self.daqStartButton.clicked.connect(self.data_acquisition)
         # self.stopButton.clicked.connect(self.stop_data_acquisition)
         self.actionSave.triggered.connect(self.save_data)
@@ -418,6 +450,7 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
         self.plot = self.dataPlot.plot()
         self.start_time = None  # Save the start time
         self.window_size = 10  # Rolling window size in seconds
+
 
         self.rm = pyvisa.ResourceManager()
         try:
@@ -450,7 +483,6 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
                 self.daq_thread.data_ready.connect(self.update_plot)
                 self.daq_thread.start()
 
-
                 self.daqStartButton.setEnabled(True)
                 self.isDaqConnected = True
                 self.daqConnectButton.setText("Disconnect")
@@ -471,32 +503,15 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
             self.daq_stop_event.set()
             self.daq_thread.join()
             self.daq_device.close()
-            event.accept()
+            self.daq_stop_event.accept()
             self.daqConnectButton.setText("Connect")
-
-    def load_vol_value(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.ReadOnly
-        file_name, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "", "CSV Files (*.csv);;All Files (*)", options=options)
-        if file_name:
-            self.data = pd.read_csv(file_name)
-            # self.value_edit.setText(str(self.data['value'].mean()))
-
-    def plot_vol(self):
-        if hasattr(self, 'data'):
-            pg.plot(self.data['time'], self.data['value'], title='Time vs Value')
-
-    def set_vol_value(self):
-        if hasattr(self, 'data'):
-            set_value = float(self.value_edit1.text())
-            self.data['value'] = [set_value if x < set_value else x for x in self.data['value']]
 
     def readCSV(self):
         with open('config.csv', 'r') as f:
             reader = csv.reader(f, skipinitialspace=True, delimiter=',')
             headers = next(reader)
             for row in reader:
-                self.data.append({
+                self.daq_config.append({
                     headers[0]: row[0],
                     headers[1]: row[1],
                     headers[2]: row[2],
@@ -506,8 +521,8 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
         self.updateTable()
 
     def updateTable(self):
-        self.tableWidget.setRowCount(len(self.data))
-        for i, item in enumerate(self.data):
+        self.tableWidget.setRowCount(len(self.daq_config))
+        for i, item in enumerate(self.daq_config):
             self.tableWidget.setItem(i, 0, QTableWidgetItem(item['Channel id']))
             self.tableWidget.setItem(i, 1, QTableWidgetItem(item['Measurement']))
             self.tableWidget.setItem(i, 2, QTableWidgetItem(item['Sensor type']))
@@ -519,7 +534,7 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
 
     def updateDisplay(self, state):
         row = self.tableWidget.indexAt(self.sender().pos()).row()
-        self.data[row]['Display'] = state == QtCore.Qt.Checked
+        self.daq_config[row]['Display'] = state == QtCore.Qt.Checked
     
     def data_acquisition(self):
         if self.isDaqAcquiringData == False:
@@ -546,6 +561,16 @@ class DataAcquisitionSystem(QMainWindow, Ui_MainWindow):
             self.plot_curve1.yData[-self.window_size:] + [data[0]])
         self.plot_curve2.setData(self.plot_curve2.xData[-self.window_size:] + [elapsed_time], \
             self.plot_curve2.yData[-self.window_size:] + [data[1]])
+        
+        for tab_index in range(0, self.tab_widget.count()):
+            # print(tab_index)
+            # print(self.tab_widget.widget(tab_index))
+            # print(hasattr(self.tab_widget.widget(tab_index), 'plotCurve'))
+            # print(hasattr(self.tab_widget.widget(tab_index), 'value_edit'))
+            if hasattr(self.tab_widget.widget(tab_index), 'plotCurve'):
+                # self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
+                # self.curvePlot.addItem(self.current_time_line)
+                self.self.tab_widget.widget(tab_index).current_time_line.setValue(elapsed_time)
 
     def save_data(self):
         # options = QFileDialog.Options()
