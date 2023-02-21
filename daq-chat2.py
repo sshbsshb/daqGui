@@ -24,7 +24,7 @@ from time import sleep
 import pyqtgraph as pg
 import pandas as pd
 class EquipmentInfoTab(QWidget):
-    def __init__(self, equipment_config):
+    def __init__(self, equipment_config, tab_widget):
         super().__init__()
 
         # Create labels for each piece of equipment information
@@ -34,6 +34,9 @@ class EquipmentInfoTab(QWidget):
         # layout.addWidget(name_label)
         # layout.addWidget(type_label)
         self.load_curve_data = None
+        self.tab_widget = tab_widget
+        self.isEqptRunning = False
+        self.isEqptConnected = False
 
         tab_layout = QGridLayout()
         self.load_button = QPushButton("Load")
@@ -57,6 +60,7 @@ class EquipmentInfoTab(QWidget):
         tab_layout.addWidget(self.synchronize_checkbox, 2, 0)
         self.start_button = QPushButton("Start")
         tab_layout.addWidget(self.start_button, 2, 1 )
+        self.start_button.setEnabled(False)
         # self.connect1_checkBox = QCheckBox('combined control')
         # self.connect1_checkBox.toggle()
         # self.tab1_layout.addWidget(self.connect1_checkBox, 1, 2)
@@ -89,6 +93,7 @@ class EquipmentInfoTab(QWidget):
 
 
         if equipment_config['type'] == 'serial':
+            pass
             # method_label = QLabel(f"<b>Method:</b> {equipment_config['method']}")
             # port_label = QLabel(f"<b>Port:</b> {equipment_config['port']}")
             # baudrate_label = QLabel(f"<b>Baudrate:</b> {equipment_config['baudrate']}")
@@ -147,9 +152,10 @@ class EquipmentInfoTab(QWidget):
             # self.start_button = QPushButton("Start")        # Read the configuration file
 
             # # Connect the button to the start_operation method
-            self.start_button.clicked.connect(lambda: self.start_operation(equipment_config))
+            # self.start_button.clicked.connect(lambda: self.start_operation(equipment_config))
 
         elif equipment_config['type'] == 'tcp':
+            pass
             # host_label = QLabel(f"<b>Host:</b> {equipment_config['host']}")
             # port_label = QLabel(f"<b>Port:</b> {equipment_config['port']}")
             # timeout_label = QLabel(f"<b>Timeout:</b> {equipment_config['timeout']}")
@@ -172,7 +178,7 @@ class EquipmentInfoTab(QWidget):
             # # Connect the button to the start_operation method
             # self.start_button.clicked.connect(lambda: self.start_operation(equipment_config))
             # # Initialize the synchronization flag
-            self.is_synchronized = False
+            # self.is_synchronized = False
 
         else:
             # If the equipment type is not recognized, display an error message
@@ -183,47 +189,69 @@ class EquipmentInfoTab(QWidget):
         self.setLayout(tab_layout)       
 
     def connect_equipment(self, equipment_config):
-        if equipment_config['type'] == 'serial':
-            method = equipment_config['method']
-            port = equipment_config['port']
-            baudrate = equipment_config['baudrate']
-            parity = equipment_config['parity']
-            stopbits = equipment_config['stopbits']
-            timeout = equipment_config['timeout']
-            slave_id = equipment_config['slave_id']
+        if self.isEqptConnected == False:
+            if equipment_config['type'] == 'serial':
+                method = equipment_config['method']
+                port = equipment_config['port']
+                baudrate = int(equipment_config['baudrate'])
+                parity = equipment_config['parity']
+                stopbits = int(equipment_config['stopbits'])
+                timeout = int(equipment_config['timeout'])
+                slave_id = int(equipment_config['slave_id'])
 
-            # Create the ModbusSerialClient
-            client = ModbusSerialClient(method=method, port=port, baudrate=baudrate, parity=parity, stopbits=stopbits, timeout=timeout)
-            # Connect to the equipment
-            connection = client.connect()
-            if connection:
-                print(f"Connected to {equipment_config['name']} on {equipment_config['port']}")
-            else:
-                print(f"Failed to connect to {equipment_config['name']} on {equipment_config['port']}")
+                # Create the ModbusSerialClient
+                client = ModbusSerialClient(method=method, port=port, baudrate=baudrate, parity=parity, stopbits=stopbits, timeout=timeout)
+                # Connect to the equipment
+                connection = client.connect()
+                if connection:
+                    print(f"Connected to {equipment_config['name']} on {equipment_config['port']}")
+                    self.client = client
+                    self.isEqptConnected = True
+                    self.connect_button.setText("Disconnect")
+                    self.start_button.setEnabled(True)
+                else:
+                    print(f"Failed to connect to {equipment_config['name']} on {equipment_config['port']}")
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Error")
+                    msg.setInformativeText(f"Failed to connect to {equipment_config['name']} on {equipment_config['port']}")
+                    msg.setWindowTitle("Error")
+                    msg.exec_()
+                    self.start_button.setEnabled(True)
+            elif equipment_config['type'] == 'tcp':
+                host = equipment_config['host']
+                port = int(equipment_config['port'])
+                timeout = int(equipment_config['timeout'])
+                slave_id = equipment_config['slave_id']
 
-            self.client = client
+                # Create the ModbusTcpClient
+                client = ModbusTcpClient(host=host, port=port, timeout=timeout)
+                # Connect to the equipment
+                connection = client.connect()
+                if connection:
+                    print(f"Connected to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
+                    self.client = client
+                    self.isEqptConnected = True
+                    self.connect_button.setText("Disconnect")
+                    self.start_button.setEnabled(True)
+                else:
+                    print(f"Failed to connect to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
+                    msg = QMessageBox()
+                    msg.setIcon(QMessageBox.Critical)
+                    msg.setText("Error")
+                    msg.setInformativeText(f"Failed to connect to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
+                    msg.setWindowTitle("Error")
+                    msg.exec_()
 
-        elif equipment_config['type'] == 'tcp':
-            host = equipment_config['host']
-            port = equipment_config['port']
-            timeout = equipment_config['timeout']
-            slave_id = equipment_config['slave_id']
+        else:
+            self.client.close()
+            self.isEqptConnected = False
+            self.connect_button.setText("Connect")
+            self.start_button.setEnabled(False)
+            # TODO: Perform operations on the equipment using pymodbus
 
-            # Create the ModbusTcpClient
-            client = ModbusTcpClient(host=host, port=port, timeout=timeout)
-            # Connect to the equipment
-            connection = client.connect()
-            if connection:
-                print(f"Connected to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
-            else:
-                print(f"Failed to connect to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
-
-            self.client = client
-
-        # TODO: Perform operations on the equipment using pymodbus
-
-        # Disconnect from the equipment when done
-        # client.close()
+            # Disconnect from the equipment when done
+            # client.close()
     def load_curve(self, equipment_config):
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
@@ -247,7 +275,16 @@ class EquipmentInfoTab(QWidget):
     def start_operation(self, equipment_config):
         # Check the status of the synchronization checkbox
         self.is_synchronized = self.synchronize_checkbox.isChecked()
+
         print(f"Synchronization is {'' if self.is_synchronized else 'not '}enabled")
+        for tab_index in range(0, self.tab_widget.count()):
+            # print(tab_index)
+            # print(self.tab_widget.widget(tab_index))
+            # print(hasattr(self.tab_widget.widget(tab_index), 'plotCurve'))
+            # print(hasattr(self.tab_widget.widget(tab_index), 'value_edit'))
+            print(self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked())
+                # self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
+                # self.curvePlot.addItem(self.current_time_line)
 
         # Start a new thread to perform the operation
         operation_thread = Thread(target=self.perform_operation, args=(equipment_config,))
@@ -339,7 +376,7 @@ class Ui_MainWindow(object):
         # Create a tab for each piece of equipment in the configuration file
         for section_name in self.config.sections():
             self.equipment_config = dict(self.config[section_name])
-            self.equipment_tab = EquipmentInfoTab(self.equipment_config)
+            self.equipment_tab = EquipmentInfoTab(self.equipment_config, self.tab_widget)
             # self.addTab(self.equipment_tab, self.equipment_config['name'])
             self.tab_widget.addTab(self.equipment_tab, self.equipment_config['name'])      
 
