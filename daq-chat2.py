@@ -37,6 +37,7 @@ class EquipmentInfoTab(QWidget):
         self.tab_widget = tab_widget
         self.isEqptRunning = False
         self.isEqptConnected = False
+        self.operation_thread = None
 
         tab_layout = QGridLayout()
         self.load_button = QPushButton("Load")
@@ -58,6 +59,7 @@ class EquipmentInfoTab(QWidget):
 
         self.synchronize_checkbox = QCheckBox("Synchronize")
         tab_layout.addWidget(self.synchronize_checkbox, 2, 0)
+        self.synchronize_checkbox.setEnabled(False)
         self.start_button = QPushButton("Start")
         tab_layout.addWidget(self.start_button, 2, 1 )
         self.start_button.setEnabled(False)
@@ -201,23 +203,6 @@ class EquipmentInfoTab(QWidget):
 
                 # Create the ModbusSerialClient
                 client = ModbusSerialClient(method=method, port=port, baudrate=baudrate, parity=parity, stopbits=stopbits, timeout=timeout)
-                # Connect to the equipment
-                connection = client.connect()
-                if connection:
-                    print(f"Connected to {equipment_config['name']} on {equipment_config['port']}")
-                    self.client = client
-                    self.isEqptConnected = True
-                    self.connect_button.setText("Disconnect")
-                    self.start_button.setEnabled(True)
-                else:
-                    print(f"Failed to connect to {equipment_config['name']} on {equipment_config['port']}")
-                    msg = QMessageBox()
-                    msg.setIcon(QMessageBox.Critical)
-                    msg.setText("Error")
-                    msg.setInformativeText(f"Failed to connect to {equipment_config['name']} on {equipment_config['port']}")
-                    msg.setWindowTitle("Error")
-                    msg.exec_()
-                    self.start_button.setEnabled(True)
             elif equipment_config['type'] == 'tcp':
                 host = equipment_config['host']
                 port = int(equipment_config['port'])
@@ -226,22 +211,25 @@ class EquipmentInfoTab(QWidget):
 
                 # Create the ModbusTcpClient
                 client = ModbusTcpClient(host=host, port=port, timeout=timeout)
-                # Connect to the equipment
-                connection = client.connect()
-                if connection:
-                    print(f"Connected to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
-                    self.client = client
-                    self.isEqptConnected = True
-                    self.connect_button.setText("Disconnect")
-                    self.start_button.setEnabled(True)
-                else:
-                    print(f"Failed to connect to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
-                    msg = QMessageBox()
-                    msg.setIcon(QMessageBox.Critical)
-                    msg.setText("Error")
-                    msg.setInformativeText(f"Failed to connect to {equipment_config['name']} at {equipment_config['host']}:{equipment_config['port']}")
-                    msg.setWindowTitle("Error")
-                    msg.exec_()
+            
+            # Connect to the equipment
+            connection = client.connect()
+            if connection:
+                print(f"Connected to {equipment_config['name']} }")
+                self.client = client
+                self.isEqptConnected = True
+                self.connect_button.setText("Disconnect")
+                self.start_button.setEnabled(True)
+                self.synchronize_checkbox.setEnabled(True)
+            else:
+                print(f"Failed to connect to {equipment_config['name']}")
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Critical)
+                msg.setText("Error")
+                msg.setInformativeText(f"Failed to connect to {equipment_config['name']} ")
+                msg.setWindowTitle("Error")
+                msg.exec_()
+                self.synchronize_checkbox.setEnabled(False)
 
         else:
             self.client.close()
@@ -273,37 +261,61 @@ class EquipmentInfoTab(QWidget):
             # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
     
     def start_operation(self, equipment_config):
-        # Check the status of the synchronization checkbox
-        self.is_synchronized = self.synchronize_checkbox.isChecked()
+        if self.operation_thread and self.operation_thread.is_alive():
+            return
+        self.operation_thread = Thread(target=self.run_operation, args=(equipment_config))
+        self.operation_thread.start()
 
-        print(f"Synchronization is {'' if self.is_synchronized else 'not '}enabled")
-        for tab_index in range(0, self.tab_widget.count()):
-            # print(tab_index)
-            # print(self.tab_widget.widget(tab_index))
-            # print(hasattr(self.tab_widget.widget(tab_index), 'plotCurve'))
-            # print(hasattr(self.tab_widget.widget(tab_index), 'value_edit'))
-            print(self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked())
-                # self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
-                # self.curvePlot.addItem(self.current_time_line)
+        # if (self.synchronize_checkbox.isChecked()):
+        #     # Start a new thread to perform all the syn-ed operation            
+        #     print(f"Synchronization is {'' if self.is_synchronized else 'not '}enabled")
 
-        # Start a new thread to perform the operation
-        operation_thread = Thread(target=self.perform_operation, args=(equipment_config,))
-        operation_thread.start()
-    
+        #     operation_thread = Thread(target=self.perform_operation, args=(equipment_config,))
+        #     operation_thread.start()
+        # else:
+        #     # Start a new thread to perform only the single operation
+        #     operation_thread = Thread(target=self.perform_operation, args=(equipment_config,))
+        #     operation_thread.start()
+
     def perform_operation(self, equipment_config):
-        # If synchronization is enabled, wait for all equipment to be ready
-        if self.is_synchronized:
-            sleep(5)
-            print("All equipment is ready to start operation simultaneously")
+        while True:
+            if (self.synchronize_checkbox.isChecked()):
+                for tab_index in range(0, self.tab_widget.count()):
+                    # print(tab_index)
+                    # print(self.tab_widget.widget(tab_index))
+                    # print(hasattr(self.tab_widget.widget(tab_index), 'plotCurve'))
+                    # print(hasattr(self.tab_widget.widget(tab_index), 'value_edit'))
+                    print(self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked())
+                        # self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
+                        # self.curvePlot.addItem(self.current_time_line)
+                    if self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
+                        if self.tab_widget.widget(tab_index).client:
+                            result = self.tab_widget.widget(tab_index).client.read_holding_registers(address=0, count=1, unit=equipment_config['slave_id'])
+                            if result.isError():
+                                print(f"Error reading holding register on {equipment_config['name']}: {result}")
+                            else:
+                                print(f"Read holding register on {equipment_config['name']}: {result.registers}")
+                        # self.tab_widget.widget(tab_index).client.write_registers(xxxx, [xxxx,xxxx,xxxx])
+                        # #read register
+                        # request = client.read_holding_registers(xxxx,3) #covert to float
+                        # result = request.registers
 
-        # Perform the operation on this equipment
-        print(f"Starting operation on {equipment_config['name']}")
-        # TODO: Perform operation using pymodbus
+                        # #write to register
+                        # client.write_registers(xxxx, [xxxx,xxxx,xxxx])  
+                        # Perform the operation on the equipment
+                        # ...
+                        # For example, read a holding register
+                else:
+                    if self.client:
+                        result = self.client.read_holding_registers(address=0, count=1, unit=equipment_config['slave_id'])
+                        if result.isError():
+                            print(f"Error reading holding register on {equipment_config['name']}: {result}")
+                        else:
+                            print(f"Read holding register on {equipment_config['name']}: {result.registers}")
 
-        # Wait for the operation to finish
-        sleep(10)
-
-        print(f"Operation on {equipment_config['name']} is complete")
+                    # If the "Synchronize" checkbox is not checked, sleep for some time
+                    if not equipment_config.get('synchronize_checkbox'):
+                        sleep(1)
 
     def show_info(self, equipment_config):
         # Create a pop-up window to show the equipment information
