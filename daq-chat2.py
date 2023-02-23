@@ -37,7 +37,7 @@ class EquipmentInfoTab(QWidget):
         self.tab_widget = tab_widget
         self.isEqptRunning = False
         self.isEqptConnected = False
-        self.operation_thread = None
+        # self.operation_thread = None
 
         tab_layout = QGridLayout()
         self.load_button = QPushButton("Load")
@@ -215,14 +215,14 @@ class EquipmentInfoTab(QWidget):
             # Connect to the equipment
             connection = client.connect()
             if connection:
-                print(f"Connected to {equipment_config['name']} }")
+                # print(f"Connected to {equipment_config['name']}")
                 self.client = client
                 self.isEqptConnected = True
                 self.connect_button.setText("Disconnect")
                 self.start_button.setEnabled(True)
                 self.synchronize_checkbox.setEnabled(True)
             else:
-                print(f"Failed to connect to {equipment_config['name']}")
+                # print(f"Failed to connect to {equipment_config['name']}")
                 msg = QMessageBox()
                 msg.setIcon(QMessageBox.Critical)
                 msg.setText("Error")
