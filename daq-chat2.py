@@ -4,7 +4,8 @@ import pyvisa, serial
 from configparser import ConfigParser
 
 import time#, logging
-from PySide2 import QtCore, QtGui
+from PySide2 import QtCore, QtGui, QTimer
+from PySide2.QtCore import Signal, Slot
 from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
@@ -15,7 +16,8 @@ from threading import Thread
 
 import threading
 from time import sleep
-# from PyQt5 import QtCore, QtGui
+# from PyQt5 import QtCore, QtGui, QTimer
+# from PyQt5.QtCore import pyqtSignal, pyqtSlot
 # from PyQt5.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox, \
 #     QTableWidget, QTableWidgetItem, QMenu, QMenuBar, QStatusBar, QAction, \
 #     QFileDialog, QLineEdit, QPushButton, QCheckBox, QMessageBox, QVBoxLayout, \
@@ -38,6 +40,16 @@ class EquipmentInfoTab(QWidget):
         self.isEqptRunning = False
         self.isEqptConnected = False
         # self.operation_thread = None
+
+        # Initialize the current value and index
+        self.current_value = 0
+        self.current_index = 0
+        self.previous_time = None
+
+        # Create the QTimer and start it with a short timeout to allow the first operation to start immediately
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.run_operation)
+        self.timer.start(1)        
 
         tab_layout = QGridLayout()
         self.load_button = QPushButton("Load")
@@ -189,7 +201,7 @@ class EquipmentInfoTab(QWidget):
             layout.addWidget(error_label)
 
         self.setLayout(tab_layout)       
-
+    @pyqtSlot()
     def connect_equipment(self, equipment_config):
         if self.isEqptConnected == False:
             if equipment_config['type'] == 'serial':
@@ -240,6 +252,7 @@ class EquipmentInfoTab(QWidget):
 
             # Disconnect from the equipment when done
             # client.close()
+    @pyqtSlot()
     def load_curve(self, equipment_config):
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
@@ -247,25 +260,43 @@ class EquipmentInfoTab(QWidget):
         if file_name:
             self.load_curve_data = pd.read_csv(file_name)
             # self.value_edit.setText(str(self.data['value'].mean()))
-
+    @pyqtSlot()
     def plot_curve(self, equipment_config):
         if hasattr(self, 'load_curve_data'):
             self.curvePlot = pg.plot(self.load_curve_data['time'], self.load_curve_data['value'], title='Time vs Value')
             self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
             self.curvePlot.addItem(self.current_time_line)
-
+    @pyqtSlot()
     def set_value(self, equipment_config):
         if hasattr(self, 'load_curve_data'):
             set_value = float(self.value_edit.text())
             self.load_curve_data['value'] = [set_value if x > set_value else x for x in self.load_curve_data['value']]
             # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
-    
+    @pyqtSlot()
     def start_operation(self, equipment_config):
-        if self.operation_thread and self.operation_thread.is_alive():
-            return
-        self.operation_thread = Thread(target=self.run_operation, args=(equipment_config))
-        self.operation_thread.start()
+        if self.isEqptRunning == False:
+            self.operation_thread = Thread(target=self.run_operation, args=(equipment_config))
+            self.operation_thread.start()
+            for tab_index in range(0, self.tab_widget.count()):
+                if self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
+                    self.synchronize_checkbox.setEnabled(False)
+                    # self.connect_button.setEnabled(False)
+                    self.start_button.setEnabled(False)
+            self.start_button.setText("Stop")
+            self.start_button.setEnabled(True) #only this button is enable
+        else:
+            self.isEqptRunning = False
+            self.operation_thread.join()
 
+            self.synchronize_checkbox.setEnabled(False)
+            for tab_index in range(0, self.tab_widget.count()):
+                if self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
+                    self.synchronize_checkbox.setEnabled(True)
+                    # self.connect_button.setEnabled(True)
+                    self.start_button.setEnabled(True)
+            self.start_button.setText("Start")
+            # self.start_button.setEnabled(True)
+                        
         # if (self.synchronize_checkbox.isChecked()):
         #     # Start a new thread to perform all the syn-ed operation            
         #     print(f"Synchronization is {'' if self.is_synchronized else 'not '}enabled")
@@ -276,7 +307,7 @@ class EquipmentInfoTab(QWidget):
         #     # Start a new thread to perform only the single operation
         #     operation_thread = Thread(target=self.perform_operation, args=(equipment_config,))
         #     operation_thread.start()
-
+    @pyqtSlot()
     def perform_operation(self, equipment_config):
         while True:
             if (self.synchronize_checkbox.isChecked()):
@@ -286,15 +317,21 @@ class EquipmentInfoTab(QWidget):
                     # print(hasattr(self.tab_widget.widget(tab_index), 'plotCurve'))
                     # print(hasattr(self.tab_widget.widget(tab_index), 'value_edit'))
                     print(self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked())
+
                         # self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
                         # self.curvePlot.addItem(self.current_time_line)
                     if self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
-                        if self.tab_widget.widget(tab_index).client:
-                            result = self.tab_widget.widget(tab_index).client.read_holding_registers(address=0, count=1, unit=equipment_config['slave_id'])
-                            if result.isError():
-                                print(f"Error reading holding register on {equipment_config['name']}: {result}")
-                            else:
-                                print(f"Read holding register on {equipment_config['name']}: {result.registers}")
+
+                        client = self.tab_widget.widget(tab_index).client
+                        ####call respective function here
+
+
+
+                            # result = self.tab_widget.widget(tab_index).client.read_holding_registers(address=0, count=1, unit=equipment_config['slave_id'])
+                            # if result.isError():
+                            #     print(f"Error reading holding register on {equipment_config['name']}: {result}")
+                            # else:
+                            #     print(f"Read holding register on {equipment_config['name']}: {result.registers}")
                         # self.tab_widget.widget(tab_index).client.write_registers(xxxx, [xxxx,xxxx,xxxx])
                         # #read register
                         # request = client.read_holding_registers(xxxx,3) #covert to float
@@ -305,17 +342,18 @@ class EquipmentInfoTab(QWidget):
                         # Perform the operation on the equipment
                         # ...
                         # For example, read a holding register
+                        sleep(0.1)
                 else:
                     if self.client:
-                        result = self.client.read_holding_registers(address=0, count=1, unit=equipment_config['slave_id'])
-                        if result.isError():
-                            print(f"Error reading holding register on {equipment_config['name']}: {result}")
-                        else:
-                            print(f"Read holding register on {equipment_config['name']}: {result.registers}")
+                        ####call respective function here
+                        # result = self.client.read_holding_registers(address=0, count=1, unit=equipment_config['slave_id'])
+                        # if result.isError():
+                        #     print(f"Error reading holding register on {equipment_config['name']}: {result}")
+                        # else:
+                        #     print(f"Read holding register on {equipment_config['name']}: {result.registers}")
 
                     # If the "Synchronize" checkbox is not checked, sleep for some time
-                    if not equipment_config.get('synchronize_checkbox'):
-                        sleep(1)
+                        sleep(0.)
 
     def show_info(self, equipment_config):
         # Create a pop-up window to show the equipment information

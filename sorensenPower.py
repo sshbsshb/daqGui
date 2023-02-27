@@ -117,7 +117,7 @@ class sorensenPower:
     def getOutputVoltage(self):
         voltageASCII = self._writeCommand(self.COMMAND_MEASURE_VOLTAGE)
         voltage = float(voltageASCII.strip())
-equvilent
+
         return voltage
 
     def getOutputCurrent(self):
@@ -256,4 +256,23 @@ if __name__ == '__main__':
             print("Voltage: {:1.03f}, Current: {:1.03f}, Resistance: {:1.03f}".format(voltage, current, resistance))
 
         power.setOutputVoltage(0.0)
+        client.close()
+
+
+        ### testing send string method here
+
+        from pymodbus.client import ModbusSerialClient
+
+        client = ModbusSerialClient(method='rtu', port='/dev/ttyUSB0', baudrate=9600)
+
+        # Connect to the Modbus server
+        client.connect()
+
+        # Encode the string as a series of 16-bit Unicode characters
+        message = b'\x01\x10\x00\x10\x00\x0C\x18\x24\x3E\x4A\x56\x62\x6E\x7A'
+
+        # Send the message and receive the response
+        response = client.send(message)
+
+        # Close the connection
         client.close()
