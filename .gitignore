@@ -7,3 +7,7 @@
 /testcsv.py
 /testcsvplot.py
 /testcsvplot2.py
+__pycache__/DaqInfoTab.cpython-311.pyc
+__pycache__/EquipmentHandler.cpython-311.pyc
+__pycache__/EquipmentInfoTab.cpython-311.pyc
+tt.py
