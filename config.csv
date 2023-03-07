@@ -1,3 +1,3 @@
 Channel id,Measurement,Probe type,Sensor type,Display,Remark
-1, TEMP, TC, K, False, TC K-type temperature
-2, TEMP, THER, 5000, False, Thermistor 5000 temperature
+101, TEMP, TC, K, False, TC K-type temperature
+103, TEMP, THER, 5000, False, Thermistor 5000 temperature

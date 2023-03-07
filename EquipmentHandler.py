@@ -301,17 +301,24 @@ class EquipmentHandler(QWidget):
             checkBox.stateChanged.connect(self.updateDisplay)
             self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
             self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
-    
+
     def apply_daq_setting(self):
         if self.isEqptConnected == True:
             self.client.write("*RST")
-            time.sleep(0.5)
+            time.sleep(0.2)
             # channel = self.channelComboBox.currentIndex() + 1
             # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
-            self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
-            self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
-            self.client.write(':ROUTe:SCAN (%s)' % ('@101:106'))
-            time.sleep(0.5)
+            # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
+            # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
+            scan_list = ""
+            for i, item in enumerate(self.loaded_data):
+                # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+                self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+                time.sleep(0.1)
+                scan_list = scan_list + "," + item['Channel id']
+            time.sleep(0.1)
+            # print((':ROUTe:SCAN (@%s)' % (scan_list)))
+            self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
 
     def updateDisplay(self, state):
         row = self.equipment_tab.tableWidget.indexAt(self.sender().pos()).row()
