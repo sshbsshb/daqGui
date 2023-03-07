@@ -331,7 +331,7 @@ class EquipmentHandler(QWidget):
             time.sleep(0.1)
             # print((':ROUTe:SCAN (@%s)' % (scan_list)))
             self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
-            self.nPlots = self.loaded_data.shape[0]
+            self.nPlots = len(self.loaded_data)
             self.initPlot()
 
     def updateDisplay(self, state):
