@@ -36,7 +36,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = True
+        self.isDebug = False
 
         self.initUI()
         
@@ -51,7 +51,7 @@ class EquipmentHandler(QWidget):
             self.isDAQ = True
             self.daqTiming = 1000
 
-            self.nPlots = 10
+            self.nPlots = 6
             self.data_series = pd.DataFrame(np.zeros((1, self.nPlots)))
             self.data_raw = np.zeros((1, self.nPlots))
             self.data_time = np.zeros(1)
@@ -160,6 +160,7 @@ class EquipmentHandler(QWidget):
                     # self.info_label.setText('Data not loaded!')
                     print(self.config['name']+"---"+"please set data, retry in 5 sec...")
                     self.timer.start(2000)  # or reset timer at the setButton?
+
     @Slot()
     def connect_equipment(self):
         if self.isEqptConnected == False:
@@ -169,6 +170,7 @@ class EquipmentHandler(QWidget):
                     if not self.isDebug:
                         device_name = self.equipment_tab.channelComboBox.currentText()
                         self.client = self.rm.open_resource(device_name)
+                        # self.client.timeout = 1000
 
                     # self.daq_stop_event.clear()
                     # self.daq_thread = DAQThread(self.daq_stop_event, self.daq_device, self.channels)
@@ -294,10 +296,13 @@ class EquipmentHandler(QWidget):
     def apply_daq_setting(self):
         if self.isEqptConnected == True:
             self.client.write("*RST")
-            time.sleep(0.1)
-            channel = self.channelComboBox.currentIndex() + 1
-            self.device.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
-            time.sleep(0.1)
+            time.sleep(0.5)
+            # channel = self.channelComboBox.currentIndex() + 1
+            # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
+            self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
+            self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
+            self.client.write(':ROUTe:SCAN (%s)' % ('@101:106'))
+            time.sleep(0.5)
 
     def updateDisplay(self, state):
         row = self.equipment_tab.tableWidget.indexAt(self.sender().pos()).row()
@@ -311,13 +316,15 @@ class EquipmentHandler(QWidget):
                 # for channel in self.channels:
                 #     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
                 #     temp_data.append(float(reading))
-                reading = self.client.query("READ?")
-                # voltage_values = [float(val) for val in reading.split(",")]
+                reading = self.client.query(':READ?')
+                # time.sleep(0.5)
+                format_values = [float(val) for val in reading.split(",")]
+                self.data_ready.emit(format_values)
             else:
                 my_list = random.sample(range(101), 10)
 
                 # Convert the list to a string
-                reading = ', '.join(str(x) for x in my_list)
+                # reading = ', '.join(str(x) for x in my_list)
                 self.data_ready.emit(my_list)
         # return reading
 
