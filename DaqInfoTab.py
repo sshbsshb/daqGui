@@ -30,7 +30,7 @@ class DaqInfoTab(QWidget):
         tab_layout.addWidget(self.start_button, 1, 1)
 
         self.tableWidget = QTableWidget()
-        self.tableWidget.setColumnCount(5)
+        self.tableWidget.setColumnCount(6)
         self.tableWidget.setHorizontalHeaderLabels(['Channel id','Measurement','Probe type','Sensor type','Display','Remark'])
         self.tableWidget.resize(1024,20)
         header = self.tableWidget.horizontalHeader()       
