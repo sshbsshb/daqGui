@@ -330,7 +330,7 @@ class EquipmentHandler(QWidget):
                 scan_list.append(item['Channel id'])
             time.sleep(0.1)
             scan_list_str = ",".join(str(i) for i in scan_list)
-            print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
+            # print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
             self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
             self.nPlots = len(self.loaded_data)
             self.initPlot()
