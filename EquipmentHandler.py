@@ -37,7 +37,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = False
+        self.isDebug = True
 
         self.initUI()
         
@@ -299,7 +299,7 @@ class EquipmentHandler(QWidget):
             self.equipment_tab.tableWidget.setItem(i, 3, QTableWidgetItem(item['Sensor type']))
             checkBox = QCheckBox()
             checkBox.setChecked(item['Display'])
-            checkBox.stateChanged.connect(self.updateDisplay)
+            checkBox.stateChanged.connect(lambda state, row=i: self.updateDisplay(row, state==QtCore.Qt.Checked))
             self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
             self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
         # scan_list = ""
@@ -313,6 +313,13 @@ class EquipmentHandler(QWidget):
         # # self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
         # self.nPlots = len(self.loaded_data)
         # self.initPlot()
+
+    def updateDisplay(self, row, state):
+        # row = self.tableWidget.indexAt(self.sender().pos()).row()
+        self.loaded_data[row]['Display'] = state 
+        # print(self.loaded_data[row]['Display'])
+        self.curves[row].setVisible(state)
+        ##############################################################there are bugs for multi curves.....
 
     def apply_daq_setting(self):
         if self.isEqptConnected == True:
@@ -332,12 +339,16 @@ class EquipmentHandler(QWidget):
             scan_list_str = ",".join(str(i) for i in scan_list)
             # print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
             self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
-            self.nPlots = len(self.loaded_data)
+            # sum(list(map(scan_list_str, count_element)))
+            self.nPlots = sum(list(map(count_element, scan_list_str))) #len(self.loaded_data)
             self.initPlot()
-
-    def updateDisplay(self, state):
-        row = self.equipment_tab.tableWidget.indexAt(self.sender().pos()).row()
-        self.loaded_data[row]['Display'] = state == QtCore.Qt.Checked
+    
+    def count_element(self, element):
+        if ":" in element:
+            start, end = element.split(":")
+            return abs(int(end) - int(start)) + 1
+        else:
+            return 1
     
     def daq(self):
         if self.isEqptRunning == True:
