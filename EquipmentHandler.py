@@ -16,6 +16,7 @@ import pyqtgraph as pg
 import random
 import time
 from datetime import datetime
+import os
 
 class EquipmentHandler(QWidget):
     data_ready = QtCore.Signal(list)
@@ -36,7 +37,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = False
+        self.isDebug = True
 
         self.initUI()
         
@@ -51,7 +52,9 @@ class EquipmentHandler(QWidget):
             self.isDAQ = True
             self.daqTiming = 1000
 
-            self.nPlots = 6
+            self.nPlots = 10
+            if not self.isDebug:
+                self.nPlots = 6
             self.data_series = pd.DataFrame(np.zeros((1, self.nPlots)))
             self.data_raw = np.zeros((1, self.nPlots))
             self.data_time = np.zeros(1)
@@ -165,6 +168,7 @@ class EquipmentHandler(QWidget):
     def connect_equipment(self):
         if self.isEqptConnected == False:
             if self.isDAQ == True:
+                ## conect daq
                 try:
                     # self.device = self.rm.open_resource("USB0::0x0957::0x0407::MY44041119::0::INSTR")
                     if not self.isDebug:
@@ -193,6 +197,7 @@ class EquipmentHandler(QWidget):
                     # print('error during connection')
                     self.equipment_tab.start_button.setEnabled(False)
             else:
+                ## conect eqpt
                 if self.equipment_config['type'] == 'serial':
                     method = self.equipment_config['method']
                     port = self.equipment_config['port']
@@ -234,8 +239,10 @@ class EquipmentHandler(QWidget):
                     self.equipment_tab.synchronize_checkbox.setEnabled(False)
 
         else:
-            self.start_operation() # stop it before close
-            self.client.close()
+            if self.isDAQ == True and self.isEqptRunning == True:
+                self.start_operation()
+            if not self.isDebug:
+                self.client.close()
             self.isEqptConnected = False
             self.equipment_tab.connect_button.setText("Connect")
             self.equipment_tab.start_button.setEnabled(False)
@@ -272,8 +279,9 @@ class EquipmentHandler(QWidget):
                             headers[0]: row[0],
                             headers[1]: row[1],
                             headers[2]: row[2],
-                            headers[3]: row[3] == 'True',
-                            headers[4]: row[4]
+                            headers[3]: row[3]
+                            headers[4]: row[4] == 'True',
+                            headers[5]: row[5]
                         })
                 self.display_daq_setting()
             else:
@@ -286,12 +294,13 @@ class EquipmentHandler(QWidget):
         for i, item in enumerate(self.loaded_data):
             self.equipment_tab.tableWidget.setItem(i, 0, QTableWidgetItem(item['Channel id']))
             self.equipment_tab.tableWidget.setItem(i, 1, QTableWidgetItem(item['Measurement']))
-            self.equipment_tab.tableWidget.setItem(i, 2, QTableWidgetItem(item['Sensor type']))
+            self.equipment_tab.tableWidget.setItem(i, 2, QTableWidgetItem(item['Probe type']))
+            self.equipment_tab.tableWidget.setItem(i, 3, QTableWidgetItem(item['Sensor type']))
             checkBox = QCheckBox()
             checkBox.setChecked(item['Display'])
             checkBox.stateChanged.connect(self.updateDisplay)
-            self.equipment_tab.tableWidget.setCellWidget(i, 3, checkBox)
-            self.equipment_tab.tableWidget.setItem(i, 4, QTableWidgetItem(item['Remark']))
+            self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
+            self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
     
     def apply_daq_setting(self):
         if self.isEqptConnected == True:
@@ -309,8 +318,7 @@ class EquipmentHandler(QWidget):
         self.loaded_data[row]['Display'] = state == QtCore.Qt.Checked
     
     def daq(self):
-        if self.isEqptConnected == True:
-
+        if self.isEqptRunning == True:
             if not self.isDebug:
                 # temp_data = []
                 # for channel in self.channels:
@@ -329,7 +337,6 @@ class EquipmentHandler(QWidget):
         # return reading
 
     def update_plot(self, data):
-
         current_time = time.monotonic()
         if self.start_time is None:
             self.start_time = current_time
@@ -368,7 +375,8 @@ class EquipmentHandler(QWidget):
     @Slot()
     def start_operation(self):
         if self.isDAQ == True:
-            if self.isEqptConnected == True and self.isEqptRunning == False:
+            if self.isEqptRunning == False:
+                ## start daq operation
                 if not self.isDebug:
                     self.apply_daq_setting()
                 self.timer.start(self.daqTiming)
@@ -376,12 +384,14 @@ class EquipmentHandler(QWidget):
                 self.equipment_tab.start_button.setEnabled(True)
                 self.equipment_tab.start_button.setText("Stop")
             else:
+                ## stop daq operation
                 self.timer.stop()
                 self.isEqptRunning = False
                 self.equipment_tab.start_button.setEnabled(True)
                 self.equipment_tab.start_button.setText("Start")
         else:
-            if self.isEqptConnected == True and self.isEqptRunning == False:
+            if self.isEqptRunning == False:
+                ## start daq operation
                 self.operation_thread = Thread(target=self.run_operation, args=(self.equipment_config))
                 self.operation_thread.start()
                 for tab_index in range(0, self.tab_widget.count()):
@@ -393,7 +403,7 @@ class EquipmentHandler(QWidget):
                 self.equipment_tab.start_button.setText("Stop")
                 self.equipment_tab.start_button.setEnabled(True) #only this button is enable
             else:
-
+                ## stop eqpt operation
                 # self.operation_thread.join()
 
                 self.equipment_tab.synchronize_checkbox.setEnabled(False)
@@ -434,7 +444,11 @@ class EquipmentHandler(QWidget):
         save = np.concatenate((self.data_time.reshape(-1, 1), self.data_raw), axis=1)
         # data_df = pd.DataFrame(save, columns=[i for i in range(self.nPlots+1)])
         data_df = pd.DataFrame(save, columns=['time'] + [f'V{i}' for i in range(self.nPlots)])
-        data_df.to_csv(date_str + '.csv', index=False)
+        folder_name = "data"
+        if not os.path.exists(folder_name):
+            os.makedirs(folder_name)
+        else:
+            data_df.to_csv("data/" + date_str + '.csv', index=False)
 
     def show_info(self):
         # Create a pop-up window to show the equipment information
