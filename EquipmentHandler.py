@@ -37,7 +37,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = True
+        self.isDebug = False
 
         self.initUI()
         
@@ -322,15 +322,16 @@ class EquipmentHandler(QWidget):
             # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
             # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
             # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
-            scan_list = ""
+            scan_list = []
             for i, item in enumerate(self.loaded_data):
                 # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
                 self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
                 time.sleep(0.1)
-                scan_list = scan_list + "," + item['Channel id']
+                scan_list.append(item['Channel id'])
             time.sleep(0.1)
-            # print((':ROUTe:SCAN (@%s)' % (scan_list)))
-            self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
+            scan_list_str = ",".join(str(i) for i in scan_list)
+            print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
+            self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
             self.nPlots = len(self.loaded_data)
             self.initPlot()
 
