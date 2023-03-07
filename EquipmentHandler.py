@@ -279,7 +279,7 @@ class EquipmentHandler(QWidget):
                             headers[0]: row[0],
                             headers[1]: row[1],
                             headers[2]: row[2],
-                            headers[3]: row[3]
+                            headers[3]: row[3],
                             headers[4]: row[4] == 'True',
                             headers[5]: row[5]
                         })
