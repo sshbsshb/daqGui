@@ -55,9 +55,6 @@ class EquipmentHandler(QWidget):
             self.nPlots = 10
             if not self.isDebug:
                 self.nPlots = 6
-            self.data_series = pd.DataFrame(np.zeros((1, self.nPlots)))
-            self.data_raw = np.zeros((1, self.nPlots))
-            self.data_time = np.zeros(1)
 
             self.equipment_tab = DaqInfoTab(self.equipment_config, self)
             self.initPlot()
@@ -77,6 +74,10 @@ class EquipmentHandler(QWidget):
         # # Set up plot
         self.start_time = None  # Save the start time
         self.window_size = 20  # Rolling window size in seconds
+
+        self.data_series = pd.DataFrame(np.zeros((1, self.nPlots)))
+        self.data_raw = np.zeros((1, self.nPlots))
+        self.data_time = np.zeros(1)
 
         self.dataPlot.plotItem.addLegend()
         # self.plot_curve1 = self.dataPlot.plot(pen='r', name="Channel 101")
@@ -301,11 +302,22 @@ class EquipmentHandler(QWidget):
             checkBox.stateChanged.connect(self.updateDisplay)
             self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
             self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
+        # scan_list = ""
+        # for i, item in enumerate(self.loaded_data):
+        #     print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+        #     # self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+        #     time.sleep(0.1)
+        #     scan_list = scan_list + "," + item['Channel id']
+        # time.sleep(0.1)
+        # print((':ROUTe:SCAN (@%s)' % (scan_list)))
+        # # self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
+        # self.nPlots = len(self.loaded_data)
+        # self.initPlot()
 
     def apply_daq_setting(self):
         if self.isEqptConnected == True:
             self.client.write("*RST")
-            time.sleep(0.2)
+            time.sleep(0.5)
             # channel = self.channelComboBox.currentIndex() + 1
             # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
             # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
@@ -319,6 +331,8 @@ class EquipmentHandler(QWidget):
             time.sleep(0.1)
             # print((':ROUTe:SCAN (@%s)' % (scan_list)))
             self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
+            self.nPlots = self.loaded_data.shape[0]
+            self.initPlot()
 
     def updateDisplay(self, state):
         row = self.equipment_tab.tableWidget.indexAt(self.sender().pos()).row()
