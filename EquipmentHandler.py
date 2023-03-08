@@ -29,7 +29,9 @@ class EquipmentHandler(QWidget):
 
         self.isEqptRunning = False
         self.isEqptConnected = False
+
         self.isDAQ = False
+        self.isCfgLoaded = False
         self.loaded_data = []
 
         # Initialize the current value and index
@@ -37,7 +39,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = True
+        self.isDebug = False
 
         self.initUI()
         
@@ -50,11 +52,11 @@ class EquipmentHandler(QWidget):
         
         if self.equipment_config['function'] == "daq":
             self.isDAQ = True
-            self.daqTiming = 1000
+            self.daqTiming = int(self.equipment_config["timing"])
 
-            self.nPlots = 10
-            if not self.isDebug:
-                self.nPlots = 6
+            self.nPlots = 6
+            # if not self.isDebug:
+            #     self.nPlots = 6
 
             self.equipment_tab = DaqInfoTab(self.equipment_config, self)
             self.initPlot()
@@ -268,7 +270,7 @@ class EquipmentHandler(QWidget):
     def load_setting(self):
         options = QFileDialog.Options()
         options |= QFileDialog.ReadOnly
-        file_name, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "", "CSV Files (*.csv);;All Files (*)", options=options)
+        file_name, _ = QFileDialog.getOpenFileName(self, "Load configurations.......", "", "CSV Files (*.csv);;All Files (*)", options=options)
         if file_name:
             if self.isDAQ == True:
                 self.loaded_data = []
@@ -285,6 +287,7 @@ class EquipmentHandler(QWidget):
                             headers[5]: row[5]
                         })
                 self.display_daq_setting()
+                self.isCfgLoaded = True
             else:
                 self.loaded_data = pd.read_csv(file_name)
             # self.value_edit.setText(str(self.data['value'].mean()))
@@ -299,7 +302,7 @@ class EquipmentHandler(QWidget):
             self.equipment_tab.tableWidget.setItem(i, 3, QTableWidgetItem(item['Sensor type']))
             checkBox = QCheckBox()
             checkBox.setChecked(item['Display'])
-            checkBox.stateChanged.connect(lambda state, row=i: self.updateDisplay(row, state==QtCore.Qt.Checked))
+            checkBox.stateChanged.connect(lambda state, row=i: self.updateDisplayData(row, state==QtCore.Qt.Checked))
             self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
             self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
         # scan_list = ""
@@ -314,41 +317,67 @@ class EquipmentHandler(QWidget):
         # self.nPlots = len(self.loaded_data)
         # self.initPlot()
 
+    def updateDisplayData(self, row, state):
+        # row = self.tableWidget.indexAt(self.sender().pos()).row()
+        self.loaded_data[row]['Display'] = state
+        self.updateDisplay(row, state)
+
     def updateDisplay(self, row, state):
         # row = self.tableWidget.indexAt(self.sender().pos()).row()
-        self.loaded_data[row]['Display'] = state 
+        self.loaded_data[row]['Display'] = state
         # print(self.loaded_data[row]['Display'])
-        self.curves[row].setVisible(state)
+        if self.count_plot[row] == 1:
+            idx = sum(self.count_plot[:row])
+            self.curves[idx].setVisible(state)
+        else:
+            low = sum(self.count_plot[:row])
+            high = low + self.count_plot[row]
+            for idx in range(low, high):
+                self.curves[idx].setVisible(state)
         ##############################################################there are bugs for multi curves.....
 
-    def apply_daq_setting(self):
-        if self.isEqptConnected == True:
-            self.client.write("*RST")
-            time.sleep(0.5)
-            # channel = self.channelComboBox.currentIndex() + 1
-            # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
-            # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
-            # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
-            scan_list = []
-            for i, item in enumerate(self.loaded_data):
-                # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
-                self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
-                time.sleep(0.1)
-                scan_list.append(item['Channel id'])
-            time.sleep(0.1)
-            scan_list_str = ",".join(str(i) for i in scan_list)
-            # print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
-            self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
-            # sum(list(map(scan_list_str, count_element)))
-            self.nPlots = sum(list(map(count_element, scan_list_str))) #len(self.loaded_data)
-            self.initPlot()
-    
     def count_element(self, element):
         if ":" in element:
             start, end = element.split(":")
             return abs(int(end) - int(start)) + 1
         else:
             return 1
+
+    def apply_daq_setting(self):
+        if self.isEqptConnected == True:
+            scan_list = []
+            if not self.isDebug:
+                self.client.write("*RST")
+                time.sleep(0.5)
+                # channel = self.channelComboBox.currentIndex() + 1
+                # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
+                # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
+                # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
+
+                for i, item in enumerate(self.loaded_data):
+                    # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+                    self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+                    time.sleep(0.1)
+                    scan_list.append(item['Channel id'])
+                    # self.updateDisplayData(i, item['Display'])
+                time.sleep(0.1)
+                scan_list_str = ",".join(str(i) for i in scan_list)
+                # print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
+                self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
+                # sum(list(map(scan_list_str, count_element)))
+            if self.isDebug:
+                for i, item in enumerate(self.loaded_data):
+                    scan_list.append(item['Channel id'])
+                # scan_list_str = ",".join(str(i) for i in scan_list)
+
+            self.count_plot = list(map(self.count_element, scan_list))
+            self.nPlots = sum(self.count_plot) #len(self.loaded_data)
+
+            self.initPlot()
+            for i, item in enumerate(self.loaded_data):
+                self.updateDisplay(i, item['Display'])
+    
+
     
     def daq(self):
         if self.isEqptRunning == True:
@@ -362,7 +391,7 @@ class EquipmentHandler(QWidget):
                 format_values = [float(val) for val in reading.split(",")]
                 self.data_ready.emit(format_values)
             else:
-                my_list = random.sample(range(101), 10)
+                my_list = random.sample(range(101), self.nPlots)
 
                 # Convert the list to a string
                 # reading = ', '.join(str(x) for x in my_list)
@@ -410,8 +439,9 @@ class EquipmentHandler(QWidget):
         if self.isDAQ == True:
             if self.isEqptRunning == False:
                 ## start daq operation
-                if not self.isDebug:
-                    self.apply_daq_setting()
+                if  self.isCfgLoaded == False:
+                    self.load_setting()
+                self.apply_daq_setting()
                 self.timer.start(self.daqTiming)
                 self.isEqptRunning = True
                 self.equipment_tab.start_button.setEnabled(True)
