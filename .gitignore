@@ -15,3 +15,6 @@ __pycache__/DaqInfoTab.cpython-39.pyc
 .gitignore
 __pycache__/EquipmentInfoTab.cpython-39.pyc
 __pycache__/EquipmentHandler.cpython-39.pyc
+__pycache__/DaqInfoTab.cpython-310.pyc
+__pycache__/EquipmentHandler.cpython-310.pyc
+__pycache__/EquipmentInfoTab.cpython-310.pyc

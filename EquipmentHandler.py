@@ -18,6 +18,18 @@ import time
 from datetime import datetime
 import os
 
+class TimeAxisItem(pg.AxisItem):
+    def __init__(self, *args, **kwargs):
+        super(TimeAxisItem, self).__init__(*args, **kwargs)
+
+    def tickStrings(self, values, scale, spacing):
+        # return [int2dt(value).strftime("%H:%M:%S") for value in values]
+        return [time.strftime("%H:%M:%S") for value in values]
+        # return [datetime(value) for value in values]
+
+def int2dt(ts):
+    return datetime.fromtimestamp(ts)
+
 class EquipmentHandler(QWidget):
     data_ready = QtCore.Signal(list)
     def __init__(self, equipment_config, tab_widget, dataPlot):
@@ -39,7 +51,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = False
+        self.isDebug = True
 
         self.initUI()
         
@@ -86,7 +98,11 @@ class EquipmentHandler(QWidget):
         # self.plot_curve2 = self.dataPlot.plot(pen='g', name="Channel 102")
         # self.dataPlot.setLabel('left', 'Voltage', units='V')
         # self.dataPlot.setLabel('bottom', 'Time', units='s')
-        
+
+        # set time axis
+        self.date_axis = TimeAxisItem(orientation='bottom')
+        self.dataPlot.setAxisItems(axisItems={'bottom': self.date_axis})
+
         self.curves = []
         for idx in range(self.nPlots):
             curve = pg.PlotCurveItem(pen=({'color': (idx, self.nPlots*1.3), 'width': 1}), skipFiniteCheck=True)
@@ -405,18 +421,21 @@ class EquipmentHandler(QWidget):
         elapsed_time = current_time - self.start_time  # Calculate elapsed time
         # np.append(self.data_raw, np.array(data), axis=0)
         self.data_raw = np.vstack([self.data_raw, data])
-        self.data_time = np.vstack([self.data_time, elapsed_time])
+        self.data_time = np.vstack([self.data_time, elapsed_time]).reshape((-1,))
+        # self.data_time = self.data_time.append(elapsed_time)
         # self.data_series[elapsed_time] = np.array(data)
 
         if self.data_raw.shape[0] > self.window_size:
             # self.data_series.iloc[-20:]
+            time_show = self.data_time[-self.window_size:]
             data_show = self.data_raw[-self.window_size:]
         else:
+            time_show = self.data_time
             data_show = self.data_raw
             
         # self.plot_curve1.setXRange(max(0, elapsed_time - self.window_size), elapsed_time)
         for i in range(self.nPlots):
-            self.curves[i].setData(data_show[:,i])
+            self.curves[i].setData(x=time_show[:], y=data_show[:,i])
             # self.plot_curve1.setData(data_show[:,0])
         # self.plot_curve2.setData(self.plot_curve2.xData[-self.window_size:] + [elapsed_time], \
         #     self.plot_curve2.yData[-self.window_size:] + [data[1]])   
