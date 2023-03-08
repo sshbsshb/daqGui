@@ -98,7 +98,7 @@ class EquipmentHandler(QWidget):
         # self.plot_curve2 = self.dataPlot.plot(pen='g', name="Channel 102")
         # self.dataPlot.setLabel('left', 'Voltage', units='V')
         # self.dataPlot.setLabel('bottom', 'Time', units='s')
-
+        self.dataPlot.clear()
         # set time axis
         self.date_axis = TimeAxisItem(orientation='bottom')
         self.dataPlot.setAxisItems(axisItems={'bottom': self.date_axis})
@@ -421,7 +421,7 @@ class EquipmentHandler(QWidget):
         elapsed_time = current_time - self.start_time  # Calculate elapsed time
         # np.append(self.data_raw, np.array(data), axis=0)
         self.data_raw = np.vstack([self.data_raw, data])
-        self.data_time = np.vstack([self.data_time, elapsed_time]).reshape((-1,))
+        self.data_time = np.hstack([self.data_time, elapsed_time]).reshape((-1,))
         # self.data_time = self.data_time.append(elapsed_time)
         # self.data_series[elapsed_time] = np.array(data)
 
