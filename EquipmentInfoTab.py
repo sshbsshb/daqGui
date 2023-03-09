@@ -16,23 +16,23 @@ class EquipmentInfoTab(QWidget):
     def initUI(self):
 
         tab_layout = QGridLayout()
-        self.load_button = QPushButton("Load Curve")
-        tab_layout.addWidget(self.load_button, 0, 0)
-        self.plot_button = QPushButton("Plot Curve")
-        tab_layout.addWidget(self.plot_button, 0, 1)
-        
+
         # Create the "Show Info" button
         self.show_info_button = QPushButton("Show info")
-        tab_layout.addWidget(self.show_info_button, 1, 0)
+        tab_layout.addWidget(self.show_info_button, 0, 0)
         self.connect_button = QPushButton("Connect")
-        tab_layout.addWidget(self.connect_button, 1, 1)
+        tab_layout.addWidget(self.connect_button, 0, 1)
+        self.start_button = QPushButton("Start")
+        tab_layout.addWidget(self.start_button, 0, 2 )
+        self.start_button.setEnabled(False)
 
         self.synchronize_checkbox = QCheckBox("Synchronize")
-        tab_layout.addWidget(self.synchronize_checkbox, 2, 0)
         self.synchronize_checkbox.setEnabled(False)
-        self.start_button = QPushButton("Start")
-        tab_layout.addWidget(self.start_button, 2, 1 )
-        self.start_button.setEnabled(False)
+        tab_layout.addWidget(self.synchronize_checkbox, 2, 0)
+        self.load_button = QPushButton("Load Curve")
+        tab_layout.addWidget(self.load_button, 2, 1)
+        self.plot_button = QPushButton("Plot Curve")
+        tab_layout.addWidget(self.plot_button, 2, 2)
 
         text_syle_hint='QLineEdit {\
                         background-color: white;\
@@ -43,12 +43,12 @@ class EquipmentInfoTab(QWidget):
         self.value_edit = QLineEdit()
         self.value_edit.setPlaceholderText('Enter a float value only')
         self.value_edit.setStyleSheet(text_syle_hint)
-        self.value_edit.setFixedWidth(400)
+        self.value_edit.setFixedWidth(300)
         float_validator = QtGui.QRegExpValidator(QtCore.QRegExp("^[+-]?\d{0,3}(\.\d{1,2})?$"))
         self.value_edit.setValidator(float_validator)
-        tab_layout.addWidget(self.value_edit, 3, 0)
+        tab_layout.addWidget(self.value_edit, 1, 1)
         self.set_button = QPushButton("Set value")
-        tab_layout.addWidget(self.set_button, 3, 1)
+        tab_layout.addWidget(self.set_button, 1, 2)
 
         # if self.equipment_config['type'] == 'serial':
         #     pass
@@ -65,7 +65,7 @@ class EquipmentInfoTab(QWidget):
 
                 # Connect the button to the show_info me,thod
         self.show_info_button.clicked.connect(self.handler.show_info)
-        self.load_button.clicked.connect(self.handler.load_setting)
+        self.load_button.clicked.connect(self.handler.load_curve)
         self.plot_button.clicked.connect(self.handler.plot_curve)
         self.connect_button.clicked.connect(self.handler.connect_equipment)
         self.start_button.clicked.connect(self.handler.start_operation)

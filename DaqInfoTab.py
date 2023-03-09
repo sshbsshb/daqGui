@@ -22,12 +22,20 @@ class DaqInfoTab(QWidget):
 
         self.connect_button = QPushButton("Connect")
         tab_layout.addWidget(self.connect_button, 0, 1)
-
-        self.load_button = QPushButton("Load Setting")
-        tab_layout.addWidget(self.load_button, 1, 0)
         self.start_button = QPushButton("Start")
         self.start_button.setEnabled(False)
-        tab_layout.addWidget(self.start_button, 1, 1)
+        tab_layout.addWidget(self.start_button, 0, 2)
+
+        self.load_setting_button = QPushButton("Load Setting")
+        tab_layout.addWidget(self.load_setting_button, 1, 0)
+
+        self.show_info_button = QPushButton("Show info")
+        tab_layout.addWidget(self.show_info_button, 1, 1)
+        self.show_info_button.clicked.connect(self.handler.show_info)
+
+        self.save_data_button = QPushButton("Save data")
+        tab_layout.addWidget(self.save_data_button, 1, 2)
+        self.save_data_button.clicked.connect(self.handler.save_data)
 
         self.tableWidget = QTableWidget()
         self.tableWidget.setColumnCount(6)
@@ -41,18 +49,21 @@ class DaqInfoTab(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.Stretch)
         self.tableWidget.setEditTriggers(QTableWidget.NoEditTriggers)
-        tab_layout.addWidget(self.tableWidget, 2, 0, 1, 2)
+        tab_layout.addWidget(self.tableWidget, 2, 0, 1, 3)
 
-        self.show_info_button = QPushButton("Show info")
-        tab_layout.addWidget(self.show_info_button, 3, 0)
-        self.show_info_button.clicked.connect(self.handler.show_info)
-
-        self.save_data_button = QPushButton("Save data")
-        tab_layout.addWidget(self.save_data_button, 3, 1)
-        self.save_data_button.clicked.connect(self.handler.save_data)
+        self.synchronize_checkbox = QCheckBox("Synchronize")
+        tab_layout.addWidget(self.synchronize_checkbox, 4, 0)
+        self.synchronize_checkbox.setEnabled(False)
+        
+        self.load_button = QPushButton("Load Curve")
+        tab_layout.addWidget(self.load_button, 4, 1)
+        self.plot_button = QPushButton("Plot Curve")
+        tab_layout.addWidget(self.plot_button, 4, 2)
         # ...
         self.setLayout(tab_layout)
 
-        self.load_button.clicked.connect(self.handler.load_setting)
+        self.load_button.clicked.connect(self.handler.load_curve)
+        self.plot_button.clicked.connect(self.handler.plot_curve)
+        self.load_setting_button.clicked.connect(self.handler.load_setting)
         self.connect_button.clicked.connect(self.handler.connect_equipment)
         self.start_button.clicked.connect(self.handler.start_operation)

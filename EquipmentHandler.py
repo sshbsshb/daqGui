@@ -44,7 +44,8 @@ class EquipmentHandler(QWidget):
 
         self.isDAQ = False
         self.isCfgLoaded = False
-        self.loaded_data = []
+        self.loaded_curve = []
+        self.loaded_setting = []
 
         # Initialize the current value and index
         self.current_value = 0
@@ -150,7 +151,7 @@ class EquipmentHandler(QWidget):
         
         else:
             # Execute the next operation using the loaded data or the overridden value
-            if hasattr(self, 'loaded_data') and len(self.loaded_data) > 0:
+            if hasattr(self, 'loaded_curve') and len(self.loaded_curve) > 0:
 
                 # self.current_time, self.current_value = self.data[self.current_index]
                 self.current_time = self.curve_data.time.loc[self.current_index]
@@ -167,8 +168,8 @@ class EquipmentHandler(QWidget):
                     # return self.reset_para()
                 else:
                     # netx_time, next_value = self.data[self.current_index]
-                    netx_time = self.loaded_data.time.loc[self.current_index]
-                    next_value = self.loaded_data.value.loc[self.current_index]
+                    netx_time = self.loaded_curve.time.loc[self.current_index]
+                    next_value = self.loaded_curve.value.loc[self.current_index]
                     time_delta = netx_time - self.current_time
                     self.timer.setInterval(int(time_delta * 1000))  # Convert time delta to milliseconds
                     self.timer.start()
@@ -289,12 +290,12 @@ class EquipmentHandler(QWidget):
         file_name, _ = QFileDialog.getOpenFileName(self, "Load configurations.......", "", "CSV Files (*.csv);;All Files (*)", options=options)
         if file_name:
             if self.isDAQ == True:
-                self.loaded_data = []
+                self.loaded_setting = []
                 with open(file_name, 'r') as f:
                     reader = csv.reader(f, skipinitialspace=True, delimiter=',')
                     headers = next(reader)
                     for row in reader:
-                        self.loaded_data.append({
+                        self.loaded_setting.append({
                             headers[0]: row[0],
                             headers[1]: row[1],
                             headers[2]: row[2],
@@ -304,14 +305,18 @@ class EquipmentHandler(QWidget):
                         })
                 self.display_daq_setting()
                 self.isCfgLoaded = True
-            else:
-                self.loaded_data = pd.read_csv(file_name)
-            # self.value_edit.setText(str(self.data['value'].mean()))
 
+    @Slot()
+    def load_curve(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.ReadOnly
+        file_name, _ = QFileDialog.getOpenFileName(self, "Load curve data.......", "", "CSV Files (*.csv);;All Files (*)", options=options)
+        if file_name:
+            self.loaded_curve = pd.read_csv(file_name)
 
     def display_daq_setting(self):
-        self.equipment_tab.tableWidget.setRowCount(len(self.loaded_data))
-        for i, item in enumerate(self.loaded_data):
+        self.equipment_tab.tableWidget.setRowCount(len(self.loaded_setting))
+        for i, item in enumerate(self.loaded_setting):
             self.equipment_tab.tableWidget.setItem(i, 0, QTableWidgetItem(item['Channel id']))
             self.equipment_tab.tableWidget.setItem(i, 1, QTableWidgetItem(item['Measurement']))
             self.equipment_tab.tableWidget.setItem(i, 2, QTableWidgetItem(item['Probe type']))
@@ -322,7 +327,7 @@ class EquipmentHandler(QWidget):
             self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
             self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
         # scan_list = ""
-        # for i, item in enumerate(self.loaded_data):
+        # for i, item in enumerate(self.loaded_setting):
         #     print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
         #     # self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
         #     time.sleep(0.1)
@@ -330,18 +335,18 @@ class EquipmentHandler(QWidget):
         # time.sleep(0.1)
         # print((':ROUTe:SCAN (@%s)' % (scan_list)))
         # # self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
-        # self.nPlots = len(self.loaded_data)
+        # self.nPlots = len(self.loaded_setting)
         # self.initPlot()
 
     def updateDisplayData(self, row, state):
         # row = self.tableWidget.indexAt(self.sender().pos()).row()
-        self.loaded_data[row]['Display'] = state
+        self.loaded_setting[row]['Display'] = state
         self.updateDisplay(row, state)
 
     def updateDisplay(self, row, state):
         # row = self.tableWidget.indexAt(self.sender().pos()).row()
-        self.loaded_data[row]['Display'] = state
-        # print(self.loaded_data[row]['Display'])
+        self.loaded_setting[row]['Display'] = state
+        # print(self.loaded_setting[row]['Display'])
         if self.count_plot[row] == 1:
             idx = sum(self.count_plot[:row])
             self.curves[idx].setVisible(state)
@@ -370,7 +375,7 @@ class EquipmentHandler(QWidget):
                 # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
                 # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
 
-                for i, item in enumerate(self.loaded_data):
+                for i, item in enumerate(self.loaded_setting):
                     # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
                     self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
                     time.sleep(0.1)
@@ -382,15 +387,15 @@ class EquipmentHandler(QWidget):
                 self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
                 # sum(list(map(scan_list_str, count_element)))
             if self.isDebug:
-                for i, item in enumerate(self.loaded_data):
+                for i, item in enumerate(self.loaded_setting):
                     scan_list.append(item['Channel id'])
                 # scan_list_str = ",".join(str(i) for i in scan_list)
 
             self.count_plot = list(map(self.count_element, scan_list))
-            self.nPlots = sum(self.count_plot) #len(self.loaded_data)
+            self.nPlots = sum(self.count_plot) #len(self.loaded_setting)
 
             self.initPlot()
-            for i, item in enumerate(self.loaded_data):
+            for i, item in enumerate(self.loaded_setting):
                 self.updateDisplay(i, item['Display'])
     
 
@@ -442,15 +447,15 @@ class EquipmentHandler(QWidget):
 
     @Slot()
     def plot_curve(self):
-        if hasattr(self, 'loaded_data'):
-            self.curvePlot = pg.plot(self.loaded_data['time'], self.loaded_data['value'], title='Time vs Value')
+        if hasattr(self, 'loaded_curve') and len(self.loaded_curve) > 0:
+            self.curvePlot = pg.plot(self.loaded_curve['time'], self.loaded_curve['value'], title='Time vs Value')
             self.current_time_line = pg.InfiniteLine(angle=90, movable=False, pen=pg.mkPen('b', style=QtCore.Qt.DashLine))
             self.curvePlot.addItem(self.current_time_line)
     @Slot()
     def set_value(self):
-        if hasattr(self, 'loaded_data'):
+        if hasattr(self, 'loaded_curve'):
             set_value = float(self.value_edit.text())
-            self.loaded_data['value'] = [set_value if x > set_value else x for x in self.loaded_data['value']]
+            self.loaded_curve['value'] = [set_value if x > set_value else x for x in self.loaded_curve['value']]
             # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
     
     @Slot()
