@@ -15,6 +15,7 @@ class MainWindow(QMainWindow):
         self.config_file = config_file
 
         self.setObjectName("MainWindow")
+        self.setWindowTitle("Data Acquisition System V2")
         self.resize(1024, 1024)
         self.centralwidget = QWidget(self)
         self.centralwidget.setObjectName("centralwidget")
