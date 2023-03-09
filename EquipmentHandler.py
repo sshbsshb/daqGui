@@ -27,9 +27,6 @@ class TimeAxisItem(pg.AxisItem):
         return [time.strftime("%H:%M:%S") for value in values]
         # return [datetime(value) for value in values]
 
-def int2dt(ts):
-    return datetime.fromtimestamp(ts)
-
 class EquipmentHandler(QWidget):
     data_ready = QtCore.Signal(list)
     def __init__(self, equipment_config, tab_widget, dataPlot):
@@ -94,11 +91,8 @@ class EquipmentHandler(QWidget):
         self.data_time = np.zeros(1)
 
         self.dataPlot.plotItem.addLegend()
-        # self.plot_curve1 = self.dataPlot.plot(pen='r', name="Channel 101")
-        # self.plot_curve2 = self.dataPlot.plot(pen='g', name="Channel 102")
-        # self.dataPlot.setLabel('left', 'Voltage', units='V')
-        # self.dataPlot.setLabel('bottom', 'Time', units='s')
         self.dataPlot.clear()
+
         # set time axis
         self.date_axis = TimeAxisItem(orientation='bottom')
         self.dataPlot.setAxisItems(axisItems={'bottom': self.date_axis})
@@ -265,23 +259,7 @@ class EquipmentHandler(QWidget):
             self.isEqptConnected = False
             self.equipment_tab.connect_button.setText("Connect")
             self.equipment_tab.start_button.setEnabled(False)
-            # if self.isDAQ == True:
-            #     # self.daq_stop_event.set()
-            #     # self.daq_thread.join()
-            #     # self.daq_stop_event.accept()
-            #     self.client.close()
-            #     self.isEqptConnected = False
-            #     self.equipment_tab.connect_button.setText("Connect")
-            #     self.equipment_tab.start_button.setEnabled(False)
-            # else:
-            #     self.client.close()
-            #     self.isEqptConnected = False
-            #     self.equipment_tab.connect_button.setText("Connect")
-            #     self.equipment_tab.start_button.setEnabled(False)
-            # TODO: Perform operations on the equipment using pymodbus
 
-            # Disconnect from the equipment when done
-            # client.close()
     @Slot()
     def load_setting(self):
         options = QFileDialog.Options()
@@ -321,25 +299,12 @@ class EquipmentHandler(QWidget):
             checkBox.stateChanged.connect(lambda state, row=i: self.updateDisplayData(row, state==QtCore.Qt.Checked))
             self.equipment_tab.tableWidget.setCellWidget(i, 4, checkBox)
             self.equipment_tab.tableWidget.setItem(i, 5, QTableWidgetItem(item['Remark']))
-        # scan_list = ""
-        # for i, item in enumerate(self.loaded_data):
-        #     print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
-        #     # self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
-        #     time.sleep(0.1)
-        #     scan_list = scan_list + "," + item['Channel id']
-        # time.sleep(0.1)
-        # print((':ROUTe:SCAN (@%s)' % (scan_list)))
-        # # self.client.write(':ROUTe:SCAN (@%s)' % (scan_list))
-        # self.nPlots = len(self.loaded_data)
-        # self.initPlot()
 
     def updateDisplayData(self, row, state):
-        # row = self.tableWidget.indexAt(self.sender().pos()).row()
         self.loaded_data[row]['Display'] = state
         self.updateDisplay(row, state)
 
     def updateDisplay(self, row, state):
-        # row = self.tableWidget.indexAt(self.sender().pos()).row()
         self.loaded_data[row]['Display'] = state
         # print(self.loaded_data[row]['Display'])
         if self.count_plot[row] == 1:
@@ -350,7 +315,7 @@ class EquipmentHandler(QWidget):
             high = low + self.count_plot[row]
             for idx in range(low, high):
                 self.curves[idx].setVisible(state)
-        ##############################################################there are bugs for multi curves.....
+
 
     def count_element(self, element):
         if ":" in element:
@@ -365,10 +330,6 @@ class EquipmentHandler(QWidget):
             if not self.isDebug:
                 self.client.write("*RST")
                 time.sleep(0.5)
-                # channel = self.channelComboBox.currentIndex() + 1
-                # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
-                # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
-                # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
 
                 for i, item in enumerate(self.loaded_data):
                     # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
@@ -398,32 +359,21 @@ class EquipmentHandler(QWidget):
     def daq(self):
         if self.isEqptRunning == True:
             if not self.isDebug:
-                # temp_data = []
-                # for channel in self.channels:
-                #     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
-                #     temp_data.append(float(reading))
                 reading = self.client.query(':READ?')
                 # time.sleep(0.5)
                 format_values = [float(val) for val in reading.split(",")]
                 self.data_ready.emit(format_values)
             else:
                 my_list = random.sample(range(101), self.nPlots)
-
-                # Convert the list to a string
-                # reading = ', '.join(str(x) for x in my_list)
                 self.data_ready.emit(my_list)
-        # return reading
 
     def update_plot(self, data):
         current_time = time.monotonic()
         if self.start_time is None:
             self.start_time = current_time
         elapsed_time = current_time - self.start_time  # Calculate elapsed time
-        # np.append(self.data_raw, np.array(data), axis=0)
         self.data_raw = np.vstack([self.data_raw, data])
         self.data_time = np.hstack([self.data_time, elapsed_time]).reshape((-1,))
-        # self.data_time = self.data_time.append(elapsed_time)
-        # self.data_series[elapsed_time] = np.array(data)
 
         if self.data_raw.shape[0] > self.window_size:
             # self.data_series.iloc[-20:]
@@ -432,13 +382,9 @@ class EquipmentHandler(QWidget):
         else:
             time_show = self.data_time
             data_show = self.data_raw
-            
-        # self.plot_curve1.setXRange(max(0, elapsed_time - self.window_size), elapsed_time)
+
         for i in range(self.nPlots):
             self.curves[i].setData(x=time_show[:], y=data_show[:,i])
-            # self.plot_curve1.setData(data_show[:,0])
-        # self.plot_curve2.setData(self.plot_curve2.xData[-self.window_size:] + [elapsed_time], \
-        #     self.plot_curve2.yData[-self.window_size:] + [data[1]])   
 
     @Slot()
     def plot_curve(self):
@@ -451,8 +397,7 @@ class EquipmentHandler(QWidget):
         if hasattr(self, 'loaded_data'):
             set_value = float(self.value_edit.text())
             self.loaded_data['value'] = [set_value if x > set_value else x for x in self.loaded_data['value']]
-            # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
-    
+
     @Slot()
     def start_operation(self):
         if self.isDAQ == True:
@@ -485,8 +430,6 @@ class EquipmentHandler(QWidget):
                 self.equipment_tab.start_button.setText("Stop")
                 self.equipment_tab.start_button.setEnabled(True) #only this button is enable
             else:
-                ## stop eqpt operation
-                # self.operation_thread.join()
 
                 self.equipment_tab.synchronize_checkbox.setEnabled(False)
                 for tab_index in range(0, self.equipment_tab.tab_widget.count()):
@@ -497,32 +440,8 @@ class EquipmentHandler(QWidget):
                 self.isEqptRunning = False
                 self.equipment_tab.start_button.setText("Start")
 
-    # @Slot()
-    # def perform_operation(self):
-    #     while True:
-    #         if (self.synchronize_checkbox.isChecked()):
-    #             for tab_index in range(0, self.tab_widget.count()):
-
-    #                 print(self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked())
-
-    #                 if self.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
-
-    #                     client = self.tab_widget.widget(tab_index).client
-
-    #                     # For example, read a holding register
-    #                     sleep(0.1)
-    #             else:
-    #                 if self.client:
-
-    #                     sleep(0.)
     def save_data(self):
-        # options = QFileDialog.Options()
-
         date_str = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-        # fileName, _ = QFileDialog.getSaveFileName(self, "Save Data", "", 'CSV Files (*.csv)')
-        # if fileName:
-            # compression_opts = dict(method='zip', archive_name=date_str + '.csv')
-            # self.data_series.to_csv(date_str + '.zip', index=False, compression=compression_opts)
         save = np.concatenate((self.data_time.reshape(-1, 1), self.data_raw), axis=1)
         # data_df = pd.DataFrame(save, columns=[i for i in range(self.nPlots+1)])
         data_df = pd.DataFrame(save, columns=['time'] + [f'V{i}' for i in range(self.nPlots)])
@@ -535,7 +454,7 @@ class EquipmentHandler(QWidget):
     def show_info(self):
         # Create a pop-up window to show the equipment information
         info_dialog = QDialog()
-        info_dialog.setWindowTitle(str(self.isDAQ)) #f"Equipment Info: {self.equipment_config['name']}")
+        info_dialog.setWindowTitle(str(self.isDAQ))
         info_layout = QVBoxLayout()
         for key, value in self.equipment_config.items():
             label = QLabel(f"<b>{key.capitalize()}:</b> {value}")
