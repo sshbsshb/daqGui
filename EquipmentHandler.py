@@ -27,17 +27,16 @@ class TimeAxisItem(pg.AxisItem):
         return [time.strftime("%H:%M:%S") for value in values]
         # return [datetime(value) for value in values]
 
-def int2dt(ts):
-    return datetime.fromtimestamp(ts)
 
 class EquipmentHandler(QWidget):
     data_ready = QtCore.Signal(list)
-    def __init__(self, equipment_config, tab_widget, dataPlot):
+    def __init__(self, equipment_config, tab_widget, dataPlot, command_queue):
         # super().__init__(equipment_config)
         super().__init__()
         self.equipment_config = equipment_config
         self.tab_widget = tab_widget
         self.dataPlot = dataPlot
+        self.command_queue = command_queue
 
         self.isEqptRunning = False
         self.isEqptConnected = False
@@ -140,15 +139,33 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         self.timer.start(1)
+    
+    def daq(self):
+        if self.isEqptRunning == True:
+            if not self.isDebug:
+                # temp_data = []
+                # for channel in self.channels:
+                #     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
+                #     temp_data.append(float(reading))
+                reading = self.client.query(':READ?')
+                # time.sleep(0.5)
+                format_values = [float(val) for val in reading.split(",")]
+                self.data_ready.emit(format_values)
+            else:
+                my_list = random.sample(range(101), self.nPlots)
+
+                # Convert the list to a string
+                # reading = ', '.join(str(x) for x in my_list)
+                self.data_ready.emit(my_list)
+        # return reading
+
     # @pyqtSlot()
     def handle_timer_timeout(self):
         self.timer.stop()
         if self.isDAQ == True:
-            
             self.daq()
             self.timer.start(self.daqTiming)
-            
-        
+
         else:
             # Execute the next operation using the loaded data or the overridden value
             if hasattr(self, 'loaded_curve') and len(self.loaded_curve) > 0:
@@ -160,7 +177,7 @@ class EquipmentHandler(QWidget):
                     # Use the overridden value if it is set
                     # self.client.write_register(0, self.current_value)
                     self.set_output_voltage(self.current_time, self.current_value)
-                    self.command_queue.add_command(self.equipment_config['name'], SetOutputVoltageCommand(self.current_value))
+                    # self.command_queue.add_command(self.equipment_config['name'], SetOutputVoltageCommand(self.current_value))
                 self.current_index += 1
                 if self.current_index >= len(self.curve_data):
                     # self.current_index = 0
@@ -218,45 +235,51 @@ class EquipmentHandler(QWidget):
                     self.equipment_tab.start_button.setEnabled(False)
             else:
                 ## conect eqpt
-                if self.equipment_config['type'] == 'serial':
-                    method = self.equipment_config['method']
-                    port = self.equipment_config['port']
-                    baudrate = int(self.equipment_config['baudrate'])
-                    parity = self.equipment_config['parity']
-                    stopbits = int(self.equipment_config['stopbits'])
-                    timeout = int(self.equipment_config['timeout'])
-                    slave_id = int(self.equipment_config['slave_id'])
+                if not self.isDebug:
+                    if self.equipment_config['type'] == 'serial':
+                        method = self.equipment_config['method']
+                        port = self.equipment_config['port']
+                        baudrate = int(self.equipment_config['baudrate'])
+                        parity = self.equipment_config['parity']
+                        stopbits = int(self.equipment_config['stopbits'])
+                        timeout = int(self.equipment_config['timeout'])
+                        slave_id = int(self.equipment_config['slave_id'])
 
-                    # Create the ModbusSerialClient
-                    client = ModbusSerialClient(method=method, port=port, baudrate=baudrate, parity=parity, stopbits=stopbits, timeout=timeout)
-                elif self.equipment_config['type'] == 'tcp':
-                    host = self.equipment_config['host']
-                    port = int(self.equipment_config['port'])
-                    timeout = int(self.equipment_config['timeout'])
-                    slave_id = self.equipment_config['slave_id']
+                        # Create the ModbusSerialClient
+                        client = ModbusSerialClient(method=method, port=port, baudrate=baudrate, parity=parity, stopbits=stopbits, timeout=timeout)
+                    elif self.equipment_config['type'] == 'tcp':
+                        host = self.equipment_config['host']
+                        port = int(self.equipment_config['port'])
+                        timeout = int(self.equipment_config['timeout'])
+                        slave_id = self.equipment_config['slave_id']
 
-                    # Create the ModbusTcpClient
-                    client = ModbusTcpClient(host=host, port=port, timeout=timeout)
+                        # Create the ModbusTcpClient
+                        client = ModbusTcpClient(host=host, port=port, timeout=timeout)
             
-                # Connect to the equipment
-                connection = client.connect()
-                if connection:
-                    # print(f"Connected to {equipment_config['name']}")
-                    self.client = client
+                    # Connect to the equipment
+                    connection = client.connect()
+                    if connection:
+                        # print(f"Connected to {equipment_config['name']}")
+                        self.client = client
+                        self.isEqptConnected = True
+                        self.equipment_tab.connect_button.setText("Disconnect")
+                        self.equipment_tab.start_button.setEnabled(True)
+                        self.equipment_tab.synchronize_checkbox.setEnabled(True)
+                    else:
+                        # print(f"Failed to connect to {equipment_config['name']}")
+                        msg = QMessageBox()
+                        msg.setIcon(QMessageBox.Critical)
+                        msg.setText("Error")
+                        msg.setInformativeText(f"Failed to connect to {self.equipment_config['name']} ")
+                        msg.setWindowTitle("Error")
+                        msg.exec_()
+                        self.equipment_tab.start_button.setEnabled(False)
+                        self.equipment_tab.synchronize_checkbox.setEnabled(False)
+                else:
                     self.isEqptConnected = True
                     self.equipment_tab.connect_button.setText("Disconnect")
                     self.equipment_tab.start_button.setEnabled(True)
                     self.equipment_tab.synchronize_checkbox.setEnabled(True)
-                else:
-                    # print(f"Failed to connect to {equipment_config['name']}")
-                    msg = QMessageBox()
-                    msg.setIcon(QMessageBox.Critical)
-                    msg.setText("Error")
-                    msg.setInformativeText(f"Failed to connect to {self.equipment_config['name']} ")
-                    msg.setWindowTitle("Error")
-                    msg.exec_()
-                    self.equipment_tab.start_button.setEnabled(False)
-                    self.equipment_tab.synchronize_checkbox.setEnabled(False)
 
         else:
             if self.isDAQ == True and self.isEqptRunning == True:
@@ -355,7 +378,6 @@ class EquipmentHandler(QWidget):
             high = low + self.count_plot[row]
             for idx in range(low, high):
                 self.curves[idx].setVisible(state)
-        ##############################################################there are bugs for multi curves.....
 
     def count_element(self, element):
         if ":" in element:
@@ -397,27 +419,6 @@ class EquipmentHandler(QWidget):
             self.initPlot()
             for i, item in enumerate(self.loaded_setting):
                 self.updateDisplay(i, item['Display'])
-    
-
-    
-    def daq(self):
-        if self.isEqptRunning == True:
-            if not self.isDebug:
-                # temp_data = []
-                # for channel in self.channels:
-                #     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
-                #     temp_data.append(float(reading))
-                reading = self.client.query(':READ?')
-                # time.sleep(0.5)
-                format_values = [float(val) for val in reading.split(",")]
-                self.data_ready.emit(format_values)
-            else:
-                my_list = random.sample(range(101), self.nPlots)
-
-                # Convert the list to a string
-                # reading = ', '.join(str(x) for x in my_list)
-                self.data_ready.emit(my_list)
-        # return reading
 
     def update_plot(self, data):
         current_time = time.monotonic()
@@ -478,29 +479,32 @@ class EquipmentHandler(QWidget):
                 self.equipment_tab.start_button.setText("Start")
         else:
             if self.isEqptRunning == False:
-                ## start daq operation
-                self.operation_thread = Thread(target=self.run_operation, args=(self.equipment_config))
-                self.operation_thread.start()
-                for tab_index in range(0, self.tab_widget.count()):
-                    if self.equipment_tab.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
-                        self.synchronize_checkbox.setEnabled(False)
-                        # self.connect_button.setEnabled(False)
-                        self.equipment_tab.start_button.setEnabled(False)
+                # if not self.isDebug:
+                if self.equipment_tab.synchronize_checkbox.isChecked():
+                    for tab_index in range(0, self.tab_widget.count()):
+                        if self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.isChecked():
+                            self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.setEnabled(False)
+                            # self.connect_button.setEnabled(False)
+                            self.tab_widget.widget(tab_index).equipment_tab.start_button.setEnabled(False)
+
                 self.isEqptRunning = True
                 self.equipment_tab.start_button.setText("Stop")
                 self.equipment_tab.start_button.setEnabled(True) #only this button is enable
+                self.equipment_tab.synchronize_checkbox.setEnabled(False)
             else:
                 ## stop eqpt operation
                 # self.operation_thread.join()
-
-                self.equipment_tab.synchronize_checkbox.setEnabled(False)
-                for tab_index in range(0, self.equipment_tab.tab_widget.count()):
-                    if self.equipment_tab.tab_widget.widget(tab_index).synchronize_checkbox.isChecked():
-                        self.equipment_tab.synchronize_checkbox.setEnabled(True)
-                        # self.connect_button.setEnabled(True)
-                        self.equipment_tab.start_button.setEnabled(True)
+                # if not self.isDebug:
+                if self.equipment_tab.synchronize_checkbox.isChecked():
+                    for tab_index in range(0, self.tab_widget.count()):
+                        if self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.isChecked():
+                            self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.setEnabled(True)
+                            # self.connect_button.setEnabled(True)
+                            self.tab_widget.widget(tab_index).equipment_tab.start_button.setEnabled(True)
                 self.isEqptRunning = False
                 self.equipment_tab.start_button.setText("Start")
+                self.equipment_tab.start_button.setEnabled(True)
+                self.equipment_tab.synchronize_checkbox.setEnabled(True)
 
     # @Slot()
     # def perform_operation(self):

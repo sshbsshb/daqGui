@@ -1,3 +1,25 @@
+from abc import ABC, abstractmethod
+from PySide2.QtCore import QObject, Signal, Slot, QTimer, QMutex, QWaitCondition, QThread, QMutexLocker, QMetaObject
+
+class Command(ABC):
+    @abstractmethod
+    def execute(self, equipment):
+        pass
+
+class SetOutputVoltageCommand(Command):
+    def __init__(self, value):
+        self.value = value
+
+    def execute(self, equipment):
+        # equipment.set_output_voltage(self.value)
+        print("---------------***********************-------------------")
+        print(str(equipment)+"-queue--"+str(self.value))
+        print("---------------********************************------------")
+
+class ReadInputVoltageCommand(Command):
+    def execute(self, equipment):
+        value = equipment.read_input_voltage()
+        # Do something with the value
 
 class CommandQueue(QObject):
     command_added = Signal()
@@ -83,3 +105,6 @@ class CommandQueueExeThread(QThread):
             command.execute(self.command_queue.equipment2)
         elif equipment_name == 'equipment3':
             command.execute(self.command_queue.equipment3)
+    
+    def set_output_voltage(self, time, value):
+        print(self.config['name']+"---"+str(time)+"s"+str(value))
