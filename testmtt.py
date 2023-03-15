@@ -1,0 +1,241 @@
+from abc import ABC, abstractmethod
+# from concurrent.futures import ThreadPoolExecutor
+from PySide2.QtCore import QObject, Signal, Slot, QTimer, QMutex, QWaitCondition, QThread, QMutexLocker, QMetaObject
+from PySide2 import QtWidgets
+# from PySide2.QtCore import QObject, Signal, Slot, QTimer, QMutex, QWaitCondition, QThread, QMutexLocker, QMetaObject
+# from PySide2 import QtWidgets
+# from equipment_classes import Equipment1, Equipment2, Equipment3
+import csv, sys
+import pandas as pd
+
+import threading
+import queue
+import time
+
+class Command(ABC):
+    @abstractmethod
+    def execute(self, equipment):
+        pass
+
+
+class SetOutputVoltageCommand(Command):
+    def __init__(self, value):
+        self.value = value
+
+    def execute(self, equipment):
+        # equipment.set_output_voltage(self.value)
+        print("---------------***********************-------------------")
+        print(str(equipment)+"-queue--"+str(self.value))
+        print("---------------********************************------------")
+
+class ReadInputVoltageCommand(Command):
+    def execute(self, equipment):
+        value = equipment.read_input_voltage()
+        # Do something with the value
+
+class Equipment:
+    def __init__(self, config, command_queue):
+        self.config = config
+        self.data = []
+        self.command_queue = command_queue
+        
+        # Initialize the current value setting and index
+        ##@@@@ when restart should reset these values
+        self.current_value = 0
+        self.current_index = 0
+        self.current_time = 0
+        if self.config['name'] == "equipment1":
+            self.data = pd.read_csv("data.csv")
+        else:
+            self.data = pd.read_csv("data2.csv")
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.handle_timer_timeout)
+        self.timer.start(1)
+
+    def set_output_voltage(self, time, value):
+        print(self.config['name']+"---"+str(time)+"s"+str(value))
+
+    def reset_para(self):
+        self.current_value = 0
+        self.current_index = 0
+        self.current_time = 0
+        self.timer.start(1)
+    # @pyqtSlot()
+    def handle_timer_timeout(self):
+        self.timer.stop()
+       # Execute the next operation using the loaded data or the overridden value
+        if hasattr(self, 'data') and len(self.data) > 0:
+            self.current_time = self.data.time.loc[self.current_index]
+            self.current_value = self.data.value.loc[self.current_index]
+
+            if self.current_value >= 0:
+                # Use the overridden value if it is set
+                self.set_output_voltage(self.current_time, self.current_value)
+                self.command_queue.add_command(self.config['name'], SetOutputVoltageCommand(self.current_value))
+            self.current_index += 1
+            if self.current_index >= len(self.data):
+                # self.current_index = 0
+                self.current_index = len(self.data) - 1
+                return self.reset_para()
+            else:
+                netx_time = self.data.time.loc[self.current_index]
+                next_value = self.data.value.loc[self.current_index]
+                time_delta = netx_time - self.current_time
+                self.timer.setInterval(int(time_delta * 1000))  # Convert time delta to milliseconds
+                self.timer.start()
+        else:
+            if self.current_value != 0:
+                # Use the overridden value if it is set
+                # self.client.write_register(0, self.current_value)
+                self.set_output_voltage(self.current_time, self.current_value)
+            else:
+                # self.info_label.setText('Data not loaded!')
+                print(self.config['name']+"---"+"please set data, retry in 5 sec...")
+                self.timer.start(2000)  # or reset timer at the setButton?
+
+
+class CommandQueue(QObject):
+    command_added = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.commands = {}
+        self.mutex = QMutex()
+        self.wait_condition = QWaitCondition()
+
+    @Slot(str, Command)
+    def add_command(self, equipment_name, command):
+        self.mutex.lock()
+        if equipment_name not in self.commands:
+            self.commands[equipment_name] = []
+        self.commands[equipment_name].append(command)
+        self.mutex.unlock()
+        self.wait_condition.wakeAll() 
+        self.command_added.emit()
+
+class CommandQueueExeThread(QThread):
+    def __init__(self, command_queue):
+        super().__init__()
+        self.command_queue = command_queue
+        self.isRuning = True
+
+    def run(self):
+        self.execute_commands()
+
+    def remove_command(self, equipment_name):
+        with QMutexLocker(self.command_queue.mutex):
+            if equipment_name in self.command_queue.commands and self.command_queue.commands[equipment_name]:
+                command = self.command_queue.commands[equipment_name].pop(0)
+                return command
+            else:
+                return None
+
+    def execute_wakeup(self):
+        QMetaObject.invokeMethod(self, 'wakeup')
+    
+    def execute_wakeup(self, status):
+        self.isRuning = status
+        QMetaObject.invokeMethod(self, 'wakeup')
+    @Slot()    
+    def wakeup(self):
+        self.command_queue.mutex.lock()
+        self.command_queue.wait_condition.wakeOne()
+        self.command_queue.mutex.unlock()
+        
+    def execute_commands(self):
+        while self.isRuning:
+            print("in loop")
+            if not any(self.command_queue.commands.values()):
+                self.command_queue.mutex.lock()
+                print("lock and wait")
+                # Wait for new commands to be added to the queue
+                # self.command_added.clear()
+                self.command_queue.wait_condition.wait(self.command_queue.mutex)
+                self.command_queue.mutex.unlock()
+                print("unlock")
+            else:
+            # Get the first equipment with a command waiting in the queue
+                equipment_name, command = next(
+                    ((name, queue) for name, queue in self.command_queue.commands.items() if queue),
+                    (None, None)
+                )
+                print("run")
+                # Execute the next command for the equipment
+                
+                command = command[0]
+                # self.mutex.unlock()
+                self.execute_command(equipment_name, command)
+                self.remove_command(equipment_name)
+
+    def execute_command(self, equipment_name, command):
+        # Execute the command for the specified equipment
+        if equipment_name == 'equipment1':
+            command.execute(self.command_queue.equipment1)
+        elif equipment_name == 'equipment2':
+            command.execute(self.command_queue.equipment2)
+        elif equipment_name == 'equipment3':
+            command.execute(self.command_queue.equipment3)
+
+
+
+class MainProgram(QtWidgets.QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        self.equipment_configs = [
+        {
+            'name': 'equipment1',
+            'type': 'Type A',
+            'connection_method': 'rtu',
+            'port_or_host': 'COM1',
+            'baud_rate': 9600,
+            'parity': 'N',
+            'stop_bits': 1,
+            'timeout': 1
+        },
+        {
+            'name': 'equipment2',
+            'type': 'Type B',
+            'connection_method': 'rtu',
+            'port_or_host': 'COM2',
+            'baud_rate': 9600,
+            'parity': 'N',
+            'stop_bits': 1,
+            'timeout': 1
+        }
+    ]
+        self.command_queue = CommandQueue()
+        self.command_queue_exe = CommandQueueExeThread(self.command_queue)
+
+        for equipment_config in self.equipment_configs:
+            equipment_name = equipment_config['name']
+            if equipment_name == 'equipment1':
+                equipment = Equipment(equipment_config, self.command_queue)
+                self.command_queue.equipment1 = equipment
+            elif equipment_name == 'equipment2':
+                equipment = Equipment(equipment_config, self.command_queue)
+                self.command_queue.equipment2 = equipment
+
+        self.command_queue.command_added.connect(self.process_command_queue)
+        self.command_queue_exe.start()
+
+    def process_command_queue(self):
+        self.command_queue_exe.execute_wakeup(True)
+        
+    def closeEvent(self, event):
+        self.command_queue_exe.quit()
+        self.command_queue_exe.execute_wakeup(False)
+        self.command_queue_exe.wait()
+        event.accept()
+
+def main():
+    app = QtWidgets.QApplication(sys.argv)
+    main = MainProgram()
+    # main.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowStaysOnTopHint)
+    main.setFixedSize(1280, 1024)
+    main.show()
+    sys.exit(app.exec_())
+
+
+if __name__ == '__main__':
+    main()

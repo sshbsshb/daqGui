@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import serial
+# import serial
 
 # Assumes the following settings for the DCS M9 RS-232 Interface
 # Baud-rate = 19200
@@ -20,7 +20,7 @@ class sorensenPower:
     COMMAND_GET_STATUS              = ":SOUR:STAT:BLOC?\r"
     COMMAND_RETURN_LOCAL            = ":SYST:LOCAL ON\r"
 
-    def __init__(self, client, debug=False):
+    def __init__(self, client, debug=True):
         # self.portName = portName
         # self.baudrate = baudrate
 
@@ -45,6 +45,8 @@ class sorensenPower:
     # def __del__(self):
     #     # Make sure we return control to local.
     #     self.disconnect()
+    def setValue(self, value):
+        print(f"Type A setting value: {value}")
 
     def _writeCommand(self, command):
         result = None
@@ -136,7 +138,7 @@ class sorensenPower:
         return success
 
     def setOutputVoltageRamp(self, endVoltage, rampTimeSec):
-        success = Falseequvilent
+        success = False
         if ((endVoltage >= 0.0) and (endVoltage <= self.maxVoltage) and (rampTimeSec >= 0.0) and (rampTimeSec < 99.0)):
             self._writeCommand(self.COMMAND_SET_VOLTAGE_RAMP.format(endVoltage, rampTimeSec))
             success = True

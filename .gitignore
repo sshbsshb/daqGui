@@ -19,3 +19,6 @@ __pycache__/DaqInfoTab.cpython-310.pyc
 __pycache__/EquipmentHandler.cpython-310.pyc
 __pycache__/EquipmentInfoTab.cpython-310.pyc
 __pycache__/CommandQueue.cpython-310.pyc
+testMT2.py
+__pycache__/dcpsPower.cpython-310.pyc
+__pycache__/sorensenPower.cpython-310.pyc

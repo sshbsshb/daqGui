@@ -9,6 +9,7 @@ from EquipmentHandler import EquipmentHandler
 from CommandQueue import CommandQueue, CommandQueueExeThread
 from configparser import ConfigParser
 import pyqtgraph as pg
+import threading
 
 class MainWindow(QMainWindow):
     def __init__(self, config_file):
@@ -47,10 +48,13 @@ class MainWindow(QMainWindow):
         for section_name in self.config.sections():
             self.equipment_config = dict(self.config[section_name])
             self.equipment_tab = EquipmentHandler(self.equipment_config, self.tab_widget, self.dataPlot, self.command_queue)
-            self.tab_widget.addTab(self.equipment_tab, section_name)   
+            self.tab_widget.addTab(self.equipment_tab, section_name)
 
-        self.command_queue.command_added.connect(self.process_command_queue)
-        self.command_queue_exe.start()
+        command_queue = CommandQueue()
+        # Start the command execution thread
+        execution_thread = threading.Thread(target=command_queue.execute_commands)
+        execution_thread.daemon = True
+        execution_thread.start()
 
         self.gridLayout.setRowStretch(0, 5)
         self.gridLayout.setRowStretch(1, 1)
@@ -84,15 +88,6 @@ class MainWindow(QMainWindow):
     #     self.daqConnectButton.setText(_translate("MainWindow", "Connect"))
     #     self.menuFile.setTitle(_translate("MainWindow", "File"))
     #     self.actionSave.setText(_translate("MainWindow", "Save"))
-
-    def process_command_queue(self):
-        self.command_queue_exe.execute_wakeup(True)
-        
-    def closeEvent(self, event):
-        self.command_queue_exe.quit()
-        self.command_queue_exe.execute_wakeup(False)
-        self.command_queue_exe.wait()
-        event.accept()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

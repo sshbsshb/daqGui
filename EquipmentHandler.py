@@ -5,6 +5,11 @@ from PySide2.QtWidgets import QWidget, QFileDialog, QMessageBox, QDialog, QVBoxL
 
 from EquipmentInfoTab import EquipmentInfoTab
 from DaqInfoTab import DaqInfoTab
+from sorensenPower import sorensenPower
+from dcpsPower import dcpsPower
+from CommandQueue import Command
+
+import threading
 
 import csv
 from pymodbus.client import ModbusSerialClient, ModbusTcpClient
@@ -55,8 +60,10 @@ class EquipmentHandler(QWidget):
 
         self.initUI()
         
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.handle_timer_timeout)
+        # self.timer = QTimer()
+        # self.timer.timeout.connect(self.handle_timer_timeout)
+        self.timer = threading.Timer(0, self.handle_timer_timeout)
+
         self.data_ready.connect(self.update_plot)
         # self.timer.start(100)
 
@@ -161,45 +168,53 @@ class EquipmentHandler(QWidget):
 
     # @pyqtSlot()
     def handle_timer_timeout(self):
-        self.timer.stop()
+        # self.timer.stop()
         if self.isDAQ == True:
             self.daq()
-            self.timer.start(self.daqTiming)
+            # self.timer.start(self.daqTiming)
+            timer = threading.Timer(self.daqTiming, self.handle_timer_timeout)
+            timer.start()
 
         else:
+            if self.current_index < len(self.loaded_curve):
+                # row = self.loaded_curve.iloc[self.current_index]
+                # current_time = row['time']
+                # value = row['value']
+                current_time = self.curve_data.time.loc[self.current_index]
+                current_value = self.curve_data.value.loc[self.current_index]
+                # self.add_set_value_command(value)
+                # self.equipment_cmd.setOutputVoltage(value)
+                self.command_queue.add_command(\
+                    Command(self.equipment_cmd.setValue, self.equipment_cmd, current_value))
+                self.current_index += 1
+                if self.current_index < len(self.curve_data):
+                    time_delta = current_time - self.loaded_curve.time.loc[self.current_index]
+                    timer = threading.Timer(time_delta, self.handle_timer_timeout)
+                    timer.start()
             # Execute the next operation using the loaded data or the overridden value
-            if hasattr(self, 'loaded_curve') and len(self.loaded_curve) > 0:
+            # if hasattr(self, 'loaded_curve') and len(self.loaded_curve) > 0:
 
                 # self.current_time, self.current_value = self.data[self.current_index]
-                self.current_time = self.curve_data.time.loc[self.current_index]
-                self.current_value = self.curve_data.value.loc[self.current_index]
-                if self.current_value >= 0:
-                    # Use the overridden value if it is set
-                    # self.client.write_register(0, self.current_value)
-                    self.set_output_voltage(self.current_time, self.current_value)
-                    # self.command_queue.add_command(self.equipment_config['name'], SetOutputVoltageCommand(self.current_value))
-                self.current_index += 1
-                if self.current_index >= len(self.curve_data):
-                    # self.current_index = 0
-                    self.current_index = len(self.curve_data) - 1 #prevent null pointer
-                    # return self.reset_para()
-                else:
-                    # netx_time, next_value = self.data[self.current_index]
-                    netx_time = self.loaded_curve.time.loc[self.current_index]
-                    next_value = self.loaded_curve.value.loc[self.current_index]
-                    time_delta = netx_time - self.current_time
-                    self.timer.setInterval(int(time_delta * 1000))  # Convert time delta to milliseconds
-                    self.timer.start()
+                # self.current_time = self.curve_data.time.loc[self.current_index]
+                # self.current_value = self.curve_data.value.loc[self.current_index]
+                # if self.current_value >= 0:
+                #     # Use the overridden value if it is set
+                #     # self.client.write_register(0, self.current_value)
+                #     self.set_output_voltage(self.current_time, self.current_value)
+                #     # self.command_queue.add_command(self.equipment_config['name'], SetOutputVoltageCommand(self.current_value))
+                # self.current_index += 1
+                # if self.current_index >= len(self.curve_data):
+                #     # self.current_index = 0
+                #     self.current_index = len(self.curve_data) - 1 #prevent null pointer
+                #     # return self.reset_para()
+                # else:
+                #     # netx_time, next_value = self.data[self.current_index]
+                #     netx_time = self.loaded_curve.time.loc[self.current_index]
+                #     next_value = self.loaded_curve.value.loc[self.current_index]
+                #     time_delta = netx_time - self.current_time
+                #     self.timer.setInterval(int(time_delta * 1000))  # Convert time delta to milliseconds
+                #     self.timer.start()
 
-            else:
-                if self.current_value != 0:
-                    # Use the overridden value if it is set
-                    # self.client.write_register(0, self.current_value)
-                    self.set_output_voltage(self.current_time, self.current_value)
-                else:
-                    # self.info_label.setText('Data not loaded!')
-                    print(self.config['name']+"---"+"please set data, retry in 5 sec...")
-                    self.timer.start(2000)  # or reset timer at the setButton?
 
     @Slot()
     def connect_equipment(self):
@@ -265,6 +280,11 @@ class EquipmentHandler(QWidget):
                         self.equipment_tab.connect_button.setText("Disconnect")
                         self.equipment_tab.start_button.setEnabled(True)
                         self.equipment_tab.synchronize_checkbox.setEnabled(True)
+
+                        if self.equipment_config['name'] == "sorensen":
+                            self.equipment_cmd = sorensenPower(self.client)
+                        elif self.equipment_config['name'] == "dcps":
+                            self.equipment_cmd = dcpsPower(self.client)
                     else:
                         # print(f"Failed to connect to {equipment_config['name']}")
                         msg = QMessageBox()
@@ -454,11 +474,22 @@ class EquipmentHandler(QWidget):
             self.curvePlot.addItem(self.current_time_line)
     @Slot()
     def set_value(self):
-        if hasattr(self, 'loaded_curve'):
-            set_value = float(self.value_edit.text())
-            self.loaded_curve['value'] = [set_value if x > set_value else x for x in self.loaded_curve['value']]
-            # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
-    
+        # if hasattr(self, 'loaded_curve'):
+        #     set_value = float(self.value_edit.text())
+        #     self.loaded_curve['value'] = [set_value if x > set_value else x for x in self.loaded_curve['value']]
+        #     # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
+
+        set_value = float(self.value_edit.text())
+        if set_value > 0:
+            # Use the overridden value if it is set
+            # self.client.write_register(0, self.current_value)
+            # self.set_output_voltage(self.current_time, self.current_value)
+            self.command_queue.add_command(\
+            Command(self.equipment_cmd.setValue, self.equipment_cmd, set_value))
+        else: # set ==0
+            # self.info_label.setText('Data not loaded!')
+            self.command_queue.add_command(\
+                Command(self.equipment_cmd.setValue, self.equipment_cmd, 0))    
     @Slot()
     def start_operation(self):
         if self.isDAQ == True:
