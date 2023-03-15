@@ -145,7 +145,7 @@ class EquipmentHandler(QWidget):
         self.current_value = 0
         self.current_index = 0
         self.current_time = 0
-        self.timer.start(1)
+        # self.timer.start(1)
     
     def daq(self):
         if self.isEqptRunning == True:
@@ -172,25 +172,26 @@ class EquipmentHandler(QWidget):
         if self.isDAQ == True:
             self.daq()
             # self.timer.start(self.daqTiming)
-            timer = threading.Timer(self.daqTiming, self.handle_timer_timeout)
-            timer.start()
+            self.timer = threading.Timer(self.daqTiming, self.handle_timer_timeout)
+            self.timer.start()
 
         else:
             if self.current_index < len(self.loaded_curve):
                 # row = self.loaded_curve.iloc[self.current_index]
                 # current_time = row['time']
                 # value = row['value']
-                current_time = self.curve_data.time.loc[self.current_index]
-                current_value = self.curve_data.value.loc[self.current_index]
+                current_time = self.loaded_curve.time.loc[self.current_index]
+                current_value = self.loaded_curve.value.loc[self.current_index]
                 # self.add_set_value_command(value)
                 # self.equipment_cmd.setOutputVoltage(value)
                 self.command_queue.add_command(\
                     Command(self.equipment_cmd.setValue, self.equipment_cmd, current_value))
                 self.current_index += 1
-                if self.current_index < len(self.curve_data):
-                    time_delta = current_time - self.loaded_curve.time.loc[self.current_index]
-                    timer = threading.Timer(time_delta, self.handle_timer_timeout)
-                    timer.start()
+                if self.current_index < len(self.loaded_curve):
+                    time_delta = self.loaded_curve.time.loc[self.current_index] - current_time
+                    # print(f"next is {time_delta} sec")
+                    self.timer = threading.Timer(time_delta, self.handle_timer_timeout)
+                    self.timer.start()
             # Execute the next operation using the loaded data or the overridden value
             # if hasattr(self, 'loaded_curve') and len(self.loaded_curve) > 0:
 
@@ -296,6 +297,12 @@ class EquipmentHandler(QWidget):
                         self.equipment_tab.start_button.setEnabled(False)
                         self.equipment_tab.synchronize_checkbox.setEnabled(False)
                 else:
+                    # test case
+                    client = []
+                    if self.equipment_config['name'] == "sorensen":
+                        self.equipment_cmd = sorensenPower(client)
+                    elif self.equipment_config['name'] == "dcps":
+                        self.equipment_cmd = dcpsPower(client)
                     self.isEqptConnected = True
                     self.equipment_tab.connect_button.setText("Disconnect")
                     self.equipment_tab.start_button.setEnabled(True)
@@ -479,7 +486,7 @@ class EquipmentHandler(QWidget):
         #     self.loaded_curve['value'] = [set_value if x > set_value else x for x in self.loaded_curve['value']]
         #     # self.curvePlot.setData(self.load_curve_data['time'], self.load_curve_data['value'])
 
-        set_value = float(self.value_edit.text())
+        set_value = float(self.equipment_tab.value_edit.text())
         if set_value > 0:
             # Use the overridden value if it is set
             # self.client.write_register(0, self.current_value)
@@ -517,11 +524,15 @@ class EquipmentHandler(QWidget):
                             self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.setEnabled(False)
                             # self.connect_button.setEnabled(False)
                             self.tab_widget.widget(tab_index).equipment_tab.start_button.setEnabled(False)
+                            self.tab_widget.widget(tab_index).timer = threading.Timer(0, self.tab_widget.widget(tab_index).handle_timer_timeout)
+                            self.tab_widget.widget(tab_index).timer.start()
 
                 self.isEqptRunning = True
                 self.equipment_tab.start_button.setText("Stop")
                 self.equipment_tab.start_button.setEnabled(True) #only this button is enable
                 self.equipment_tab.synchronize_checkbox.setEnabled(False)
+                # self.timer = threading.Timer(0, self.handle_timer_timeout)
+                # self.timer.start()
             else:
                 ## stop eqpt operation
                 # self.operation_thread.join()

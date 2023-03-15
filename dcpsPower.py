@@ -11,6 +11,9 @@ class dcpsPower:
         self.unit = unit
         self.client = client
 
+    def setValue(self, value):
+        print(f"Type B setting value: {value}")
+ 
     def getOutputVoltage(self):
         address = 0x0B00
         voltage = self.read_register(address=address, count=2, salve=self.unit)

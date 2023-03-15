@@ -40,7 +40,9 @@ class sorensenPower:
         self.client = client
 
         # self.connect()
-        self.getModel()
+
+        ###########################################
+        # self.getModel()
 
     # def __del__(self):
     #     # Make sure we return control to local.

@@ -6,7 +6,7 @@ from PySide2.QtWidgets import QApplication, QMainWindow, QGridLayout, QComboBox,
         QTabWidget, QHBoxLayout, QWidget, QHeaderView, QLabel, QDialog
 import sys
 from EquipmentHandler import EquipmentHandler
-from CommandQueue import CommandQueue, CommandQueueExeThread
+from CommandQueue import CommandQueue
 from configparser import ConfigParser
 import pyqtgraph as pg
 import threading
@@ -41,16 +41,14 @@ class MainWindow(QMainWindow):
         self.config = ConfigParser()
         self.config.read(self.config_file)
 
-        self.command_queue = CommandQueue()
-        self.command_queue_exe = CommandQueueExeThread(self.command_queue)
+        command_queue = CommandQueue()
 
         # Create a tab for each piece of equipment in the configuration file and initial it at the same time
         for section_name in self.config.sections():
             self.equipment_config = dict(self.config[section_name])
-            self.equipment_tab = EquipmentHandler(self.equipment_config, self.tab_widget, self.dataPlot, self.command_queue)
+            self.equipment_tab = EquipmentHandler(self.equipment_config, self.tab_widget, self.dataPlot, command_queue)
             self.tab_widget.addTab(self.equipment_tab, section_name)
 
-        command_queue = CommandQueue()
         # Start the command execution thread
         execution_thread = threading.Thread(target=command_queue.execute_commands)
         execution_thread.daemon = True
