@@ -43,7 +43,7 @@ class EquipmentInfoTab(QWidget):
         self.value_edit = QLineEdit()
         self.value_edit.setPlaceholderText('Enter a float value only')
         self.value_edit.setStyleSheet(text_syle_hint)
-        self.value_edit.setFixedWidth(300)
+        self.value_edit.setFixedWidth(250)
         float_validator = QtGui.QRegExpValidator(QtCore.QRegExp("^[+-]?\d{0,3}(\.\d{1,2})?$"))
         self.value_edit.setValidator(float_validator)
         tab_layout.addWidget(self.value_edit, 1, 1)

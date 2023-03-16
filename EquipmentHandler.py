@@ -7,6 +7,7 @@ from EquipmentInfoTab import EquipmentInfoTab
 from DaqInfoTab import DaqInfoTab
 from sorensenPower import sorensenPower
 from dcpsPower import dcpsPower
+from keysightDaq import keysightDaq
 from CommandQueue import Command
 
 import threading
@@ -60,9 +61,10 @@ class EquipmentHandler(QWidget):
 
         self.initUI()
         
-        # self.timer = QTimer()
-        # self.timer.timeout.connect(self.handle_timer_timeout)
+        
         self.timer = threading.Timer(0, self.handle_timer_timeout)
+        self.qtimer = QTimer()
+        self.qtimer.timeout.connect(self.handle_timer_timeout)
 
         self.data_ready.connect(self.update_plot)
         # self.timer.start(100)
@@ -73,7 +75,7 @@ class EquipmentHandler(QWidget):
             self.isDAQ = True
             self.daqTiming = int(self.equipment_config["timing"])
 
-            self.nPlots = 6
+            self.nPlots = 7
             # if not self.isDebug:
             #     self.nPlots = 6
 
@@ -149,21 +151,24 @@ class EquipmentHandler(QWidget):
     
     def daq(self):
         if self.isEqptRunning == True:
-            if not self.isDebug:
-                # temp_data = []
-                # for channel in self.channels:
-                #     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
-                #     temp_data.append(float(reading))
-                reading = self.client.query(':READ?')
-                # time.sleep(0.5)
-                format_values = [float(val) for val in reading.split(",")]
-                self.data_ready.emit(format_values)
-            else:
-                my_list = random.sample(range(101), self.nPlots)
+            # if not self.isDebug:
+            #     # temp_data = []
+            #     # for channel in self.channels:
+            #     #     reading = self.daq.query(f"MEASure:VOLTage:DC? (@{channel})")
+            #     #     temp_data.append(float(reading))
+            #     reading = self.client.query(':READ?')
+            #     # time.sleep(0.5)
+            #     format_values = [float(val) for val in reading.split(",")]
+            #     self.data_ready.emit(format_values)
+            # else:
+            #     my_list = random.sample(range(101), self.nPlots)
 
-                # Convert the list to a string
-                # reading = ', '.join(str(x) for x in my_list)
-                self.data_ready.emit(my_list)
+            #     # Convert the list to a string
+            #     # reading = ', '.join(str(x) for x in my_list)
+            #     self.data_ready.emit(my_list)
+
+            format_values = self.equipment_cmd.getDaqChannels()
+            self.data_ready.emit(format_values)
         # return reading
 
     # @pyqtSlot()
@@ -171,9 +176,7 @@ class EquipmentHandler(QWidget):
         # self.timer.stop()
         if self.isDAQ == True:
             self.daq()
-            # self.timer.start(self.daqTiming)
-            self.timer = threading.Timer(self.daqTiming, self.handle_timer_timeout)
-            self.timer.start()
+            self.qtimer.start(self.daqTiming)
 
         else:
             if self.current_index < len(self.loaded_curve):
@@ -240,6 +243,9 @@ class EquipmentHandler(QWidget):
                     self.isEqptConnected = True
                     self.equipment_tab.connect_button.setText("Disconnect")
                     self.equipment_tab.start_button.setEnabled(True)
+                    if self.isDebug:
+                        self.client = []
+                    self.equipment_cmd = keysightDaq(self.client)
                 except ValueError:
                     msg = QMessageBox()
                     msg.setIcon(QMessageBox.Critical)
@@ -316,23 +322,7 @@ class EquipmentHandler(QWidget):
             self.isEqptConnected = False
             self.equipment_tab.connect_button.setText("Connect")
             self.equipment_tab.start_button.setEnabled(False)
-            # if self.isDAQ == True:
-            #     # self.daq_stop_event.set()
-            #     # self.daq_thread.join()
-            #     # self.daq_stop_event.accept()
-            #     self.client.close()
-            #     self.isEqptConnected = False
-            #     self.equipment_tab.connect_button.setText("Connect")
-            #     self.equipment_tab.start_button.setEnabled(False)
-            # else:
-            #     self.client.close()
-            #     self.isEqptConnected = False
-            #     self.equipment_tab.connect_button.setText("Connect")
-            #     self.equipment_tab.start_button.setEnabled(False)
-            # TODO: Perform operations on the equipment using pymodbus
 
-            # Disconnect from the equipment when done
-            # client.close()
     @Slot()
     def load_setting(self):
         options = QFileDialog.Options()
@@ -415,30 +405,39 @@ class EquipmentHandler(QWidget):
 
     def apply_daq_setting(self):
         if self.isEqptConnected == True:
-            scan_list = []
-            if not self.isDebug:
-                self.client.write("*RST")
-                time.sleep(0.5)
-                # channel = self.channelComboBox.currentIndex() + 1
-                # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
-                # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
-                # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
 
-                for i, item in enumerate(self.loaded_setting):
-                    # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
-                    self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
-                    time.sleep(0.1)
-                    scan_list.append(item['Channel id'])
-                    # self.updateDisplayData(i, item['Display'])
-                time.sleep(0.1)
-                scan_list_str = ",".join(str(i) for i in scan_list)
-                # print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
-                self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
-                # sum(list(map(scan_list_str, count_element)))
-            if self.isDebug:
-                for i, item in enumerate(self.loaded_setting):
-                    scan_list.append(item['Channel id'])
-                # scan_list_str = ",".join(str(i) for i in scan_list)
+            
+
+            # scan_list = []
+            # if not self.isDebug:
+            #     self.client.write("*RST")
+            #     time.sleep(0.5)
+            #     # channel = self.channelComboBox.currentIndex() + 1
+            #     # self.client.write(f"ROUTE:CHAN{channel};TEMP:NPLC 10")
+            #     # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('TCouple', 'T', '@101,102,103,104'))
+            #     # self.client.write(':CONFigure:TEMPerature %s,%s,(%s)' % ('THERmistor', '5000', '@105,106'))
+
+            #     for i, item in enumerate(self.loaded_setting):
+            #         # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+            #         self.client.write(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+            #         time.sleep(0.1)
+            #         scan_list.append(item['Channel id'])
+            #         # self.updateDisplayData(i, item['Display'])
+            #     time.sleep(0.1)
+            #     scan_list_str = ",".join(str(i) for i in scan_list)
+            #     # print((':ROUTe:SCAN (@%s)' % (scan_list_str)))
+            #     self.client.write(':ROUTe:SCAN (@%s)' % (scan_list_str))
+            #     # sum(list(map(scan_list_str, count_element)))
+            # if self.isDebug:
+            #     for i, item in enumerate(self.loaded_setting):
+            #         scan_list.append(item['Channel id'])
+            #     # scan_list_str = ",".join(str(i) for i in scan_list)
+
+            
+            scan_list = self.equipment_cmd.setDaqChannels(self.loaded_setting)
+            # need to solve the return value problem
+            # self.command_queue.add_command(\
+            #         Command(self.equipment_cmd.setDaqChannels, self.equipment_cmd, self.loaded_setting))
 
             self.count_plot = list(map(self.count_element, scan_list))
             self.nPlots = sum(self.count_plot) #len(self.loaded_setting)
@@ -505,13 +504,13 @@ class EquipmentHandler(QWidget):
                 if  self.isCfgLoaded == False:
                     self.load_setting()
                 self.apply_daq_setting()
-                self.timer.start(self.daqTiming)
+                self.qtimer.start(self.daqTiming)
                 self.isEqptRunning = True
                 self.equipment_tab.start_button.setEnabled(True)
                 self.equipment_tab.start_button.setText("Stop")
             else:
                 ## stop daq operation
-                self.timer.stop()
+                self.qtimer.stop()
                 self.isEqptRunning = False
                 self.equipment_tab.start_button.setEnabled(True)
                 self.equipment_tab.start_button.setText("Start")
@@ -522,7 +521,8 @@ class EquipmentHandler(QWidget):
                     for tab_index in range(0, self.tab_widget.count()):
                         if self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.isChecked():
                             self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.setEnabled(False)
-                            # self.connect_button.setEnabled(False)
+                            self.tab_widget.widget(tab_index).equipment_tab.connect_button.setEnabled(False)
+                            self.tab_widget.widget(tab_index).equipment_tab.start_button.setText("Running")
                             self.tab_widget.widget(tab_index).equipment_tab.start_button.setEnabled(False)
                             self.tab_widget.widget(tab_index).timer = threading.Timer(0, self.tab_widget.widget(tab_index).handle_timer_timeout)
                             self.tab_widget.widget(tab_index).timer.start()
@@ -541,7 +541,8 @@ class EquipmentHandler(QWidget):
                     for tab_index in range(0, self.tab_widget.count()):
                         if self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.isChecked():
                             self.tab_widget.widget(tab_index).equipment_tab.synchronize_checkbox.setEnabled(True)
-                            # self.connect_button.setEnabled(True)
+                            self.tab_widget.widget(tab_index).equipment_tab.connect_button.setEnabled(True)
+                            self.tab_widget.widget(tab_index).equipment_tab.start_button.setText("Start")
                             self.tab_widget.widget(tab_index).equipment_tab.start_button.setEnabled(True)
                 self.isEqptRunning = False
                 self.equipment_tab.start_button.setText("Start")

@@ -56,8 +56,6 @@ class MainWindow(QMainWindow):
 
         self.gridLayout.setRowStretch(0, 5)
         self.gridLayout.setRowStretch(1, 1)
-        # self.gridLayout.setRowStretch(2, 1)
-        # self.gridLayout.setRowStretch(3, 0)
 
         self.setCentralWidget(self.centralwidget)
 
