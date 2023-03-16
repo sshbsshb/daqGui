@@ -76,8 +76,12 @@ class EquipmentHandler(QWidget):
             self.daqTiming = int(self.equipment_config["timing"])
 
             self.nPlots = 7
+            if 'config' in self.equipment_config:
+                self.loaded_data = self.equipment_config['config']
             # if not self.isDebug:
             #     self.nPlots = 6
+            if 'curve' in self.equipment_config:
+                self.loaded_data = self.equipment_config['curve']
 
             self.equipment_tab = DaqInfoTab(self.equipment_config, self)
             self.initPlot()
@@ -140,13 +144,10 @@ class EquipmentHandler(QWidget):
             print('Device error')            
             # self.equipment_tab = tab
 
-    def set_output_voltage(self, time, value):
-        print(self.equipment_config['name']+"---"+str(time)+"s"+str(value))
-
-    def reset_para(self):
-        self.current_value = 0
-        self.current_index = 0
-        self.current_time = 0
+    # def reset_para(self):
+    #     self.current_value = 0
+    #     self.current_index = 0
+    #     self.current_time = 0
         # self.timer.start(1)
     
     def daq(self):
