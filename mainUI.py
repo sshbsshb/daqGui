@@ -84,6 +84,16 @@ class MainWindow(QMainWindow):
     #     self.daqConnectButton.setText(_translate("MainWindow", "Connect"))
     #     self.menuFile.setTitle(_translate("MainWindow", "File"))
     #     self.actionSave.setText(_translate("MainWindow", "Save"))
+    def closeEvent(self, event):
+        # Disconnect from the equipment when the system is closed
+        qm = QMessageBox()
+        ret = qm.question(self, 'DAQ system', "Are you sure you want to close the DAQ system?",
+                          qm.Yes | qm.No)
+        if ret == qm.Yes:
+            # self.equipment_tab.clear_up()------------------------------------
+            event.accept()  # let the window close
+        else:
+            event.ignore()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

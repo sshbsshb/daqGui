@@ -1,6 +1,7 @@
 import threading
 import queue
 import time
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
@@ -9,9 +10,11 @@ class Command:
         self.method = method
         self.equipment = equipment
         self.value = value
+        self.result = None
 
     def execute(self):
-        self.method(self.value)
+        self.result = self.method(self.value)
+        return self.result
 
 class CommandQueue:
     def __init__(self):
@@ -38,11 +41,13 @@ class CommandQueue:
         while True:
             command = self.remove_command()
             print("execute!")
-            command.execute()
+            result = command.execute()
+            command.equipment.results = np.append(command.equipment.results, result)
 
 class Equipment:
     def __init__(self, name):
         self.name = name
+        self.results = np.zeros(0)
 
     def connect(self):
         print(f"{self.name} connected")
@@ -54,7 +59,8 @@ class Equipment:
         print(f"{self.name} executing command: {command}")
 
 class EquipmentTypeA(Equipment):
-    def __init__(self, command_queue):
+    def __init__(self, name, command_queue):
+        super().__init__(name)
         self.command_queue = command_queue
         self.read_csv_and_schedule_commands('data.csv')
         
@@ -76,11 +82,10 @@ class EquipmentTypeA(Equipment):
 
     def setValue(self, value):
         print(f"Type A setting value: {value}")
+        return value
 
     def handle_timer_timeout(self):
-        # self.timer.stop()
-       # Execute the next operation using the loaded data or the overridden value
-        # if hasattr(self, 'data') and len(self.data) > 0:
+
         if self.current_row < len(self.data):
             row = self.data.iloc[self.current_row]
             time_delay = row['time']
@@ -90,9 +95,11 @@ class EquipmentTypeA(Equipment):
             self.current_row += 1
             timer = threading.Timer(time_delay, self.handle_timer_timeout)
             timer.start()
+        print(self.results)
 
 class EquipmentTypeB(Equipment):
-    def __init__(self, command_queue):
+    def __init__(self, name, command_queue):
+        super().__init__(name)
         self.command_queue = command_queue
         self.read_csv_and_schedule_commands('data2.csv')
     def command_1(self):
@@ -112,11 +119,9 @@ class EquipmentTypeB(Equipment):
 
     def setValue(self, value):
         print(f"Type B setting value: {value}")
+        return value
 
     def handle_timer_timeout(self):
-        # self.timer.stop()
-       # Execute the next operation using the loaded data or the overridden value
-        # if hasattr(self, 'data') and len(self.data) > 0:
         if self.current_row < len(self.data):
             row = self.data.iloc[self.current_row]
             time_delay = row['time']
@@ -182,26 +187,14 @@ if __name__ == "__main__":
     for equipment_config in equipment_configs:
         equipment_name = equipment_config['name']
         if equipment_name == 'sorensen':
-            equipmentA = EquipmentTypeA(command_queue)
+            equipmentA = EquipmentTypeA(equipment_name, command_queue)
         elif equipment_name == 'dcps':
-            equipmentB = EquipmentTypeB(command_queue)
-
-    # Create equipment, command queue, and GUI
-
-
-    # Connect the equipment
-    # equipment_handler.connect()
+            equipmentB = EquipmentTypeB(equipment_name, command_queue)
 
     # Start the command execution thread
     execution_thread = threading.Thread(target=command_queue.execute_commands)
     execution_thread.daemon = True
     execution_thread.start()
-
-    # Add commands to the queue
-    # command1 = Command(equipmentA.add_set_value_command, equipmentA, 0)
-    # command2 = Command(equipmentB.add_set_value_command, equipmentB, 0)
-    # command_queue.add_command(command1)
-    # command_queue.add_command(command2)
 
     # Let the execution thread finish
     print('start')

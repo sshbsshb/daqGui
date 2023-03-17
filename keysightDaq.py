@@ -40,7 +40,7 @@ class keysightDaq:
 
         return scan_list
 
-    def getDaqChannels(self):
+    def getDaqChannels(self, args):
         if not self.debug:
             # temp_data = []
             # for channel in self.channels:
