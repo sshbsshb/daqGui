@@ -24,26 +24,26 @@ class CommandQueue:
         with self.condition:
             self.queue.put(command)
             self.condition.notify()
-            print("notify")
+            # print("notify")
 
     def remove_command(self):
         with self.condition:
             while self.queue.empty():
-                print("wait~")
+                # print("wait~")
                 self.condition.wait()
-            print("wake!")
+            # print("wake!")
             return self.queue.get()
 
     def execute_commands(self):
         while True:
             command = self.remove_command()
-            print("execute!")
+            # print("execute!")
             result = command.execute()
-            print(result)
+            # print(result)
             # with command.equipment.results_lock:
             if result is not None:
                 if all(isinstance(item, (int, float)) for item in result):
-                    command.handler.update_plot(result)
+                    command.handler.update_plot_data(result)
                 # Check if the result is a list of strings
                 elif all(isinstance(item, str) for item in result):
                     # self.handle_string_results(command.equipment, result)

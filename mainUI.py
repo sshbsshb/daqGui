@@ -90,7 +90,8 @@ class MainWindow(QMainWindow):
         ret = qm.question(self, 'DAQ system', "Are you sure you want to close the DAQ system?",
                           qm.Yes | qm.No)
         if ret == qm.Yes:
-            # self.equipment_tab.clear_up()------------------------------------
+            message = self.equipment_tab.clear_up()
+            # print(message)
             event.accept()  # let the window close
         else:
             event.ignore()
