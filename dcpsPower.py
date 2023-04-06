@@ -16,78 +16,79 @@ class dcpsPower:
  
     def getOutputVoltage(self):
         address = 0x0B00
-        voltage = self.read_register(address=address, count=2, salve=self.unit)
+        voltage = self.client.read_register(address=address, count=2, slave=self.unit)
         print(f32_decode(voltage))
         return voltage
 
     def setOutputVoltage(self, voltage):
         address = 0x0A05
-        voltage = self.write_register(address=address, value=voltage, salve=self.unit)
+        voltage = self.client.write_register(address=address, value=voltage) #, salve=self.unit)
 
-        return success
+        return True
 
     def getMaxVoltage(self):
         address = 0x0A01
-        voltage = self.read_register(address=address, count=2, salve=self.unit)
+        voltage = self.client.read_register(address=address, count=2, slave=self.unit)
         print(f32_decode(voltage))
         return voltage
 
     def getOutputCurrent(self):
         address = 0x0B02
-        voltage = self.read_register(address=address, count=2, salve=self.unit)
+        voltage = self.client.read_register(address=address, count=2, slave=self.unit)
         print(f32_decode(voltage))
         return voltage
 
     def setOutputCurrent(self, current):
         address = 0x0A07
-        voltage = self.write_register(address=address, value=current, salve=self.unit)
+        voltage = self.client.write_register(address=address, value=current, slave=self.unit)
 
-        return success
+        return True
 
     def getMaxCurrent(self):
         address = 0x0A03
-        voltage = self.read_register(address=address, count=2, salve=self.unit)
+        voltage = self.client.read_register(address=address, count=2, slave=self.unit)
         print(f32_decode(voltage))
         return voltage
 
     def getRemoteStatus(self):
         status = None
         address = 0x0500
-        status = self.client.read_coils(address=address, count=1, salve=self.unit)
+        status = self.client.read_coils(address=address, count=1, slave=self.unit)
         return status.bits[0]
     
     def setRemoteStatus(self):
         address = 0x0500
         value = 1
-        self.client.write_coil(address=address, value=value, salve=self.unit)
+        self.client.write_coil(address=address, value=value, slave=self.unit)
 
         # return self.write_coil(int('0x0500', 1)
     def setStart(self):
         """set PSU to start."""
         address = 0x0A00
         value = 3 # ramp up
-        self.write_register(address=address, value=value, salve=self.unit)
+        self.write_register(address=address, value=value, slave=self.unit)
         value = 6 # open output, maybe not need?
-        self.write_register(address=address, value=value, salve=self.unit)        
+        self.write_register(address=address, value=value, slave=self.unit)        
  
     def setStop(self):
         """set PSU to stop"""
         address = 0x0A00
         value = 7 # close output
-        self.write_register(address=address, value=value, salve=self.unit)
+        self.write_register(address=address, value=value, slave=self.unit)
 
 if __name__ == '__main__':
-    import dcpsPower, time
+    from dcpsPower import dcpsPower
+    import time
     from pymodbus.client import ModbusSerialClient
     from pymodbus.exceptions import ModbusIOException
 
     # Define the Sorensen DLM600-5Em9E RS232 serial connection parameters
-    baudrate = 19200
+    baudrate = 9600
     bytesize = 8
     parity = 'N'
     stopbits = 1
     timeout = 0.1
-    port = '/dev/ttyUSB0'  # Replace with your own serial port name
+    port = 'COM5'  # Replace with your own serial port name
     
     # Create a ModbusSerialClient object for the Sorensen DLM600-5Em9E
     client = ModbusSerialClient(
@@ -100,7 +101,8 @@ if __name__ == '__main__':
         rtscts=True,
         timeout=timeout
     )
-    if client.connect():
+    aa = client.connect()
+    if aa:
         power = dcpsPower(client)
 
         power.setOutputVoltage(0.0)

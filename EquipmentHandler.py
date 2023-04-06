@@ -56,7 +56,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = True
+        self.isDebug = False
 
         self.initUI()
         
