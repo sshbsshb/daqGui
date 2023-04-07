@@ -56,7 +56,7 @@ class EquipmentHandler(QWidget):
         self.current_index = 0
         self.current_time = 0
         
-        self.isDebug = False
+        self.isDebug = True
 
         self.initUI()
         
@@ -349,7 +349,7 @@ class EquipmentHandler(QWidget):
             reader = csv.reader(f, skipinitialspace=True, delimiter=',')
             headers = next(reader)
             return [
-                {headers[j]: (row[j] if j != 4 else row[j] == 'True') for j in range(len(headers))}
+                {headers[j]: (row[j] if j != 3 else row[j] == 'True') for j in range(len(headers))}
                 for row in reader
             ]
 
@@ -361,7 +361,7 @@ class EquipmentHandler(QWidget):
 
     def add_item_to_table(self, row, item):
         """Add a row of settings to the table."""
-        for col, header in enumerate(['Channel id', 'Measurement', 'Probe type', 'Sensor type']):
+        for col, header in enumerate(['Channel id', 'Measurement', 'Sensor type']):
             self.equipment_tab.tableWidget.setItem(row, col, QTableWidgetItem(item[header]))
 
         checkBox = QCheckBox()
@@ -369,8 +369,8 @@ class EquipmentHandler(QWidget):
         checkBox.stateChanged.connect(
             lambda state, current_row=row: self.updateDisplayData(current_row, state == QtCore.Qt.Checked)
         )
-        self.equipment_tab.tableWidget.setCellWidget(row, 4, checkBox)
-        self.equipment_tab.tableWidget.setItem(row, 5, QTableWidgetItem(item['Remark']))
+        self.equipment_tab.tableWidget.setCellWidget(row, 3, checkBox)
+        self.equipment_tab.tableWidget.setItem(row, 4, QTableWidgetItem(item['Remark']))
 
     # def display_daq_setting(self):
     #     self.equipment_tab.tableWidget.setRowCount(len(self.loaded_setting))
