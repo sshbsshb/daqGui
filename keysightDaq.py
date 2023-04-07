@@ -24,6 +24,8 @@ class keysightDaq:
 
             for i, item in enumerate(loaded_setting):
                 # print(':CONFigure:%s %s,%s,(@%s)' % (item['Measurement'], item['Probe type'], item['Sensor type'], item['Channel id']))
+                # for old 3497xA, it should be
+                # self.client.write(':CONF:%s,%s,(@%s)' % (item['Measurement'], item['Sensor type'], item['Channel id'])) # please check command expert!
                 self.client.write(':CONF:%s %s,(@%s)' % (item['Measurement'], item['Sensor type'], item['Channel id']))
                 time.sleep(0.1)
                 scan_list.append(item['Channel id'])
