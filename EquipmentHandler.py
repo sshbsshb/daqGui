@@ -154,7 +154,8 @@ class EquipmentHandler(QWidget):
     def handle_timer_timeout(self):
         if self.isEqptRunning == True:
             if self.isDAQ == True:
-                if not hasattr(self, "loaded_curve"):
+                #if not hasattr(self, "loaded_curve"):
+                if not len(self.loaded_curve) > 0:
                     self.daq()
                     self.timer = threading.Timer(self.daqTiming, self.handle_timer_timeout)
                     self.timer.start()
@@ -234,7 +235,7 @@ class EquipmentHandler(QWidget):
                 self.equipment_tab.synchronize_checkbox.setEnabled(False)
             if self.isDebug:
                 self.client = []
-            self.equipment_cmd = keysightDaq(self.client)
+            self.equipment_cmd = keysightDaq(self.client, debug=self.isDebug)
         except ValueError:
             msg = QMessageBox()
             msg.setIcon(QMessageBox.Critical)
